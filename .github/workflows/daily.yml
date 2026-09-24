@@ -38,4 +38,12 @@ jobs:
           git config user.name "sperrkarte-bot"
           git config user.email "actions@users.noreply.github.com"
           git add state/letzter_stand.json || true
-          git diff --cached --quiet || (git commit -m "LBV-Stand
+          git diff --cached --quiet || (git commit -m "LBV-Stand aktualisiert" && git push)
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: docs }
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: { name: github-pages }
+    steps:
+      - uses: actions/deploy-pages@v4
