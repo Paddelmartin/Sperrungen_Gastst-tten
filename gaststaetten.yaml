@@ -4,49 +4,38 @@
 # euch relevant sind, nicht automatisch alle aus der Umgebung. Für jede wird täglich geprüft,
 # ob sie heute laut OpenStreetMap geöffnet hat oder Ruhetag ist.
 #
-# Diese Datei lässt sich bequem über die Seite erfassen.html pflegen, ganz ohne diese
-# Schreibweise von Hand zu tippen.
+# Diese Datei kann auch bequem über die Seite erfassen.html gepflegt werden.
 #
 # WICHTIG:
 #   - Nicht jede Gaststätte hat bei OpenStreetMap hinterlegte Öffnungszeiten, und wo doch, sind
 #     sie nicht immer aktuell. Steht auf der Karte "Öffnungszeiten unbekannt", tragt sie hier
-#     unten von Hand nach (siehe Beispiel 2: für jeden Wochentag einzeln "HH:MM-HH:MM" oder
-#     "Ruhetag"; ein fehlender Wochentag erscheint als "unbekannt").
+#     unten von Hand nach.
 #   - Ein Eintrag mit einem Fehler wird übersprungen (mit Warnung im Ablauf-Protokoll bei GitHub
 #     Actions), der Rest der Karte funktioniert trotzdem weiter.
-#   - Einrückung: nur Leerzeichen, keine Tabulatoren. Am einfachsten einen bestehenden Eintrag
-#     kopieren und nur die Werte ändern.
 
 gaststaetten:
+  - name: "Gasthaus Froschkönig"
+    osm_name: "Gasthaus Froschkönig"
 
-  # --- Beispiel 1: automatisch über OpenStreetMap (Position UND Öffnungszeiten) ---
-  # - name: "Gasthaus Zur Flussaue"
-  #   osm_name: "Zur Flussaue"          # so oder so ähnlich muss der Name bei OpenStreetMap stehen
-  #   hinweis: "Direkt am Anleger, Biergarten"
+  - name: "Spreewaldhof Leipe"
+    osm_name: "Schön Hier"
 
-  # --- Beispiel 2: Öffnungszeiten für jeden Wochentag einzeln von Hand ---
-  # - name: "Fischerstube Lehde"
-  #   osm_name: "Fischerstube"          # optional, wird dann nur für die Position genutzt
-  #   zeiten:
-  #     montag: "Ruhetag"
-  #     dienstag: "Ruhetag"
-  #     mittwoch: "11:30-20:00"
-  #     donnerstag: "11:30-20:00"
-  #     freitag: "11:30-21:00"
-  #     samstag: "11:30-21:00"
-  #     sonntag: "11:30-20:00"
-  #   hinweis: "Reservierung empfohlen"
+  - name: "Dubkow Mühle"
+    osm_name: "Dubkow Mühle"
 
-  # --- Beispiel 3: komplett von Hand, keine automatische Suche (z. B. wenn bei OSM nicht auffindbar) ---
-  # - name: "Café am Hafen"
-  #   punkt: [51.86500, 13.97500]       # Breite, Länge (Rechtsklick in OpenStreetMap, "Adresse hier anzeigen")
-  #   zeiten:
-  #     montag: "10:00-18:00"
-  #     dienstag: "10:00-18:00"
-  #     mittwoch: "Ruhetag"
-  #     donnerstag: "10:00-18:00"
-  #     freitag: "10:00-18:00"
-  #     samstag: "10:00-18:00"
-  #     sonntag: "10:00-18:00"
+  - name: "Waldhotel Eiche"
+    osm_name: "Waldhotel Eiche"
 
-  # Eure eigenen Einträge kommen ab hier darunter:
+  - name: "Gasthaus Wotschofska"
+    osm_name: "Wotschofska"
+
+  - name: "Die Stallwirtschaft im Oppott"
+    osm_name: "Die Stallwirtschaft im Oppott"
+
+  - name: "Cafe Venedig"
+    osm_name: "Cafe Venedig"
+
+  - name: "Kaupen No. 6"
+    osm_name: "Kaupen No. 6"
+
+
