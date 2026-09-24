@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spreewald – Sperrungen heute | Bootsverleih Richter</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#0F63A6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Sperrkarte">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+  :root{
+    --brand-orange:#EC6D28; --brand-orange-dark:#D25A1B;
+    --brand-blue:#0F63A6;   --brand-blue-dark:#0B4C80;
+    --bg:#F5F7FA; --card:#fff; --line:#E1E6EC;
+  }
+  html,body{height:100%;margin:0;font-family:'Poppins',system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:#2b2f33}
+  #wrap{display:flex;height:100%}
+  #side{width:380px;max-width:42vw;overflow-y:auto;background:var(--bg);border-right:1px solid var(--line);box-sizing:border-box}
+  #map{flex:1;position:relative}
+
+  #mapband{position:absolute;top:0;left:0;right:0;height:60px;z-index:460;box-sizing:border-box;
+    background:rgba(255,255,255,.94);border-bottom:3px solid var(--brand-orange);
+    box-shadow:0 2px 10px rgba(15,40,60,.12);display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+  #mapband img{height:36px;width:auto;display:block}
+  #mapband .time{font-size:12px;color:#6b7480;white-space:nowrap}
+  .leaflet-top{top:68px !important}
+
+  .content{padding:12px 14px}
+  h1{font-size:18px;margin:2px 0 2px;color:var(--brand-blue-dark);font-weight:700}
+  .sub{color:#6b7480;font-size:12.5px;margin-bottom:10px;line-height:1.4}
+  .leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;margin-bottom:12px;color:#4a5158}
+  .sw{display:inline-block;width:20px;height:0;border-top:5px solid;vertical-align:middle;margin-right:5px;border-radius:3px}
+
+  .it{background:var(--card);border:1px solid var(--line);border-left:6px solid #999;border-radius:8px;
+    padding:9px 11px;margin-bottom:9px;font-size:13px;cursor:pointer;box-shadow:0 1px 2px rgba(20,30,40,.04);
+    transition:box-shadow .15s,transform .15s}
+  .it:hover{box-shadow:0 3px 10px rgba(20,30,40,.10);transform:translateY(-1px)}
+  .it b{display:block;color:#20262c}
+  .badge{font-size:10.5px;font-weight:700;color:#fff;border-radius:999px;padding:2px 9px;margin-right:6px;
+    letter-spacing:.3px;display:inline-block}
+  .stale{background:#b00020;color:#fff;font-weight:700;padding:9px 11px;border-radius:8px;margin-bottom:12px;font-size:13.5px;line-height:1.4}
+  .warn{color:#b00020;font-size:12px} .mut{color:#6b7480;font-size:12px}
+  .owntag{display:inline-block;background:#EDEFF2;color:#4a5158;font-size:10.5px;font-weight:600;
+    border-radius:5px;padding:2px 7px;margin:3px 0 4px}
+  h2{font-size:14px;margin:0 0 8px;color:var(--brand-blue-dark)}
+
+  .tabs{display:flex;gap:8px;margin-bottom:16px}
+  .tabbtn{flex:1;font-family:inherit;font-size:13px;font-weight:600;padding:9px 10px;border-radius:8px;
+    border:1px solid var(--line);background:var(--card);color:#4a5158;cursor:pointer}
+  .tabbtn.active{background:var(--brand-blue);border-color:var(--brand-blue);color:#fff}
+  .tabbtn:not(.active):hover{background:var(--bg)}
+
+  .poi{background:var(--card);border:1px solid var(--line);border-left:6px solid #999;border-radius:8px;
+    padding:9px 11px;margin-bottom:9px;font-size:13px;cursor:pointer;box-shadow:0 1px 2px rgba(20,30,40,.04)}
+  .poi:hover{box-shadow:0 3px 10px rgba(20,30,40,.10)}
+  .poi b{display:block;color:#20262c}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+
+  #foot{padding:14px;border-top:1px solid var(--line);font-size:11.5px;color:#8a92a0;line-height:1.6}
+  #foot a{color:var(--brand-orange-dark);text-decoration:none;font-weight:600}
+  #foot a:hover{text-decoration:underline}
+
+  @media(max-width:700px){#wrap{flex-direction:column-reverse}#side{width:auto;max-width:none;height:44%}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="side"></div>
+  <div id="map"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+const D = __DATA__;
+const COL = {gesperrt:'#d32f2f', eingeschraenkt:'#f57c00', bald:'#f9a825'};
+const POI_COL = {offen:'#2e7d32', ruhetag:'#757575', unbekannt:'#b0b6bd'};
+const POI_LAB = {offen:'Heute geöffnet', ruhetag:'Heute Ruhetag', unbekannt:'Öffnungszeiten unbekannt'};
+const LAB = {gesperrt:'GESPERRT', eingeschraenkt:'EINGESCHRÄNKT', bald:'DEMNÄCHST', gebiet:'GEBIETSHINWEIS', ruht:'HEUTE NICHT AKTIV'};
+
+const map = L.map('map').setView([51.86, 13.99], 11);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  {maxZoom:19, attribution:'© OpenStreetMap-Mitwirkende'}).addTo(map);
+
+function el(tag, cls, text){const e=document.createElement(tag); if(cls)e.className=cls; if(text!=null)e.textContent=text; return e;}
+function popup(it){
+  const d=el('div'); const b=el('b',null,it.gewaesser); d.append(b, el('div',null,LAB[it.status]+' – '+it.bereich));
+  if(it.quelle==='eigen') d.append(el('div','owntag','Eigener Hinweis – nicht von der LBV'));
+  d.append(el('div','mut','Zeitraum: '+it.zeitraum));
+  if(it.grund) d.append(el('div','mut','Grund: '+it.grund));
+  d.append(el('div',null,it.hinweis));
+  if(it.paddel) d.append(el('div',null,'Paddelboote: Umtragen möglich'));
+  if(!it.genau) d.append(el('div','warn','Abschnitt nur ungefähr eingezeichnet – Text beachten!'));
+  return d;
+}
+function poiPopup(g){
+  const d=el('div'); d.append(el('b',null,g.name), el('div',null,POI_LAB[g.status]));
+  if(g.status==='offen' && g.zeiten) d.append(el('div','mut',g.zeiten));
+  if(g.hinweis) d.append(el('div',null,g.hinweis));
+  if(g.unsicher) d.append(el('div','warn','Öffnungszeiten laut OpenStreetMap ggf. unvollständig – bitte prüfen.'));
+  return d;
+}
+
+const side=document.getElementById('side');
+
+// Logo-Band über der Karte
+const mapband=el('div'); mapband.id='mapband';
+const bandLogo=document.createElement('img'); bandLogo.src='logo.png'; bandLogo.alt='Bootsverleih Richter / Kajaksports';
+const bandTime=el('div','time', D.erzeugt ? 'Aktualisiert '+D.erzeugt.slice(-5)+' Uhr' : '');
+mapband.append(bandLogo, bandTime);
+document.getElementById('map').appendChild(mapband);
+
+const content=el('div'); content.className='content'; side.append(content);
+
+function localIso(){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
+if(D.iso && D.iso!==localIso()){
+  content.append(el('div','stale','ACHTUNG: Diese Karte zeigt die Daten vom '+D.datum+' – NICHT von heute! Nicht verwenden, bis sie aktualisiert ist.'));
+}
+
+const gaststaetten = D.gaststaetten || [];
+let tabSperr, tabPoi;
+if(gaststaetten.length){                             // Tab-Leiste nur, wenn es überhaupt Gaststätten gibt
+  const tabs = el('div','tabs');
+  tabSperr = el('button','tabbtn active','Sperrungen & Einschränkungen');
+  tabPoi = el('button','tabbtn','Gaststätten');
+  tabs.append(tabSperr, tabPoi);
+  content.append(tabs);
+}
+
+const sperrView = el('div'); content.append(sperrView);
+const poiView = el('div'); poiView.style.display='none'; content.append(poiView);
+
+sperrView.append(el('h1',null,'Sperrungen – '+D.datum));
+sperrView.append(el('div','sub','Quelle: LBV Brandenburg'+(D.stand?' (Stand '+D.stand+')':'')+'. Maßgeblich bleibt die Beschilderung vor Ort.'));
+const leg=el('div','leg');
+['gesperrt','eingeschraenkt','bald'].forEach(k=>{const s=el('span'); const w=el('span','sw'); w.style.borderColor=COL[k]; s.append(w,LAB[k]); leg.append(s);});
+sperrView.append(leg);
+if(D.erzeugt) sperrView.append(el('div','mut','Karte erzeugt: '+D.erzeugt+' Uhr'));
+
+const all=L.featureGroup().addTo(map);
+const order={gesperrt:0,eingeschraenkt:1,bald:2,gebiet:3,ruht:4};
+const items=[...D.items].sort((a,b)=>order[a.status]-order[b.status]);
+
+items.forEach(it=>{
+  const layers=[];
+  const color=COL[it.status];
+  (it.geom||[]).forEach(g=>{
+    const opt={color, weight:7, opacity:.9, dashArray: it.status==='bald'?'10 8':null};
+    const lyr = g.t==='line' ? L.polyline(g.c,opt) : L.circle(g.c,{...opt,radius:g.r,weight:5,fillOpacity:.25});
+    lyr.bindPopup(()=>popup(it)); lyr.addTo(all); layers.push(lyr);
+    if(g.t==='circle'){ // Punkt, der bei jedem Zoom sichtbar bleibt
+      const dot=L.circleMarker(g.c,{radius:8,color:'#fff',weight:2,fillColor:color,fillOpacity:1});
+      dot.bindPopup(()=>popup(it)); dot.addTo(all); layers.push(dot);
+    }
+  });
+  const row=el('div','it'); row.style.borderLeftColor = color || '#999';
+  const head=el('b'); const bd=el('span','badge',LAB[it.status]); bd.style.background=color||'#777';
+  head.append(bd, it.gewaesser); row.append(head, el('div','mut',it.bereich), el('div','mut','Zeitraum: '+it.zeitraum));
+  if(it.quelle==='eigen') row.append(el('div','owntag','Eigener Hinweis – nicht von der LBV'));
+  if(it.grund) row.append(el('div','mut','Grund: '+it.grund));
+  if(it.hinweis) row.append(el('div',null,it.hinweis));
+  if(color && !layers.length){ row.append(el('div','warn','⚠ Nicht auf der Karte verortet – bitte Text beachten!')); }
+  row.onclick=()=>{ if(layers.length){ map.fitBounds(L.featureGroup(layers).getBounds().pad(.5)); layers[0].openPopup(); } };
+  sperrView.append(row);
+});
+if(!items.length) sperrView.append(el('div',null,'Keine Sperrungen oder Einschränkungen für diesen Tag gemeldet.'));
+if(all.getLayers().length) map.fitBounds(all.getBounds().pad(.2));
+
+let poiAll;
+if(gaststaetten.length){
+  const poiOrder = {offen:0, ruhetag:1, unbekannt:2};
+  const sorted = [...gaststaetten].sort((a,b)=>poiOrder[a.status]-poiOrder[b.status]);
+  poiView.append(el('h2',null,'Gaststätten in der Nähe'));
+  const poiLeg = el('div','leg');
+  ['offen','ruhetag','unbekannt'].forEach(k=>{const s=el('span'); const dot=el('span','dot'); dot.style.background=POI_COL[k]; s.append(dot,POI_LAB[k]); poiLeg.append(s);});
+  poiView.append(poiLeg);
+  poiAll = L.featureGroup();                        // erst beim Umschalten auf die Karte gelegt, siehe showPoi()
+  sorted.forEach(g=>{
+    const c = g.geom && g.geom[0] ? g.geom[0].c : null;
+    let marker = null;
+    if(c){
+      marker = L.circleMarker(c, {radius:8, color:'#fff', weight:2, fillColor:POI_COL[g.status], fillOpacity:1});
+      marker.bindPopup(()=>poiPopup(g)); marker.addTo(poiAll);
+    }
+    const row=el('div','poi'); row.style.borderLeftColor = POI_COL[g.status];
+    const head=el('b'); const dot=el('span','dot'); dot.style.background=POI_COL[g.status];
+    head.append(dot, g.name); row.append(head, el('div','mut',POI_LAB[g.status]));
+    if(g.status==='offen' && g.zeiten) row.append(el('div','mut',g.zeiten));
+    if(g.hinweis) row.append(el('div',null,g.hinweis));
+    row.onclick=()=>{ if(marker){ map.setView(c, Math.max(map.getZoom(),15)); marker.openPopup(); } };
+    poiView.append(row);
+  });
+
+  function showSperr(){
+    sperrView.style.display=''; poiView.style.display='none';
+    tabSperr.className='tabbtn active'; tabPoi.className='tabbtn';
+    if(map.hasLayer(poiAll)) map.removeLayer(poiAll);
+    if(!map.hasLayer(all)) all.addTo(map);
+    if(all.getLayers().length) map.fitBounds(all.getBounds().pad(.2));
+  }
+  function showPoi(){
+    poiView.style.display=''; sperrView.style.display='none';
+    tabPoi.className='tabbtn active'; tabSperr.className='tabbtn';
+    if(map.hasLayer(all)) map.removeLayer(all);
+    if(!map.hasLayer(poiAll)) poiAll.addTo(map);
+    if(poiAll.getLayers().length) map.fitBounds(poiAll.getBounds().pad(.2));
+  }
+  tabSperr.onclick = showSperr;
+  tabPoi.onclick = showPoi;
+}
+
+const foot=el('div'); foot.id='foot';
+foot.innerHTML='Ein Angebot von <a href="https://www.bootsverleih-richter.de" target="_blank" rel="noopener">Bootsverleih Richter / Kajaksports</a>, Lübbenau.';
+side.append(foot);
+</script>
+</body>
+</html>

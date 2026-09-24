@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gaststätten erfassen | Bootsverleih Richter</title>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+<style>
+  :root{ --brand-orange:#EC6D28; --brand-orange-dark:#D25A1B; --brand-blue:#0F63A6; --brand-blue-dark:#0B4C80;
+    --bg:#F5F7FA; --card:#fff; --line:#E1E6EC; }
+  html,body{margin:0;font-family:'Poppins',system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:#2b2f33}
+  .wrap{max-width:720px;margin:0 auto;padding:20px 16px 60px}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  header img{height:40px}
+  h1{font-size:19px;color:var(--brand-blue-dark);margin:0}
+  .sub{color:#6b7480;font-size:13px;margin-bottom:20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:18px;
+    box-shadow:0 1px 3px rgba(20,30,40,.05)}
+  .card h2{font-size:15px;color:var(--brand-blue-dark);margin:0 0 12px}
+  label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px;color:#3a4048}
+  label.inline{display:inline-flex;align-items:center;gap:5px;font-weight:400;margin:4px 10px 4px 0}
+  input[type=text],input[type=number],textarea{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--line);
+    border-radius:6px;font-family:inherit;font-size:13.5px}
+  textarea{resize:vertical}
+  .hint{font-size:11.5px;color:#8a92a0;margin-top:3px}
+  .radiogroup{display:flex;gap:16px;margin-top:4px;flex-wrap:wrap}
+  .radiogroup label{display:flex;align-items:center;gap:6px;font-weight:400;margin:0}
+  .row2{display:flex;gap:10px}
+  .row2>div{flex:1}
+  .tag-zeile{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+  .tag-zeile:last-child{border-bottom:none}
+  .tag-zeile .tagname{width:92px;flex:none;font-size:13px;font-weight:600;color:#3a4048}
+  .tag-zeile input[type=time]{width:110px}
+  .tag-zeile label{display:flex;align-items:center;gap:5px;font-weight:400;margin:0;font-size:12.5px;white-space:nowrap}
+  button{font-family:inherit;font-size:13.5px;font-weight:600;border:none;border-radius:7px;padding:9px 16px;cursor:pointer}
+  .btn-primary{background:var(--brand-orange);color:#fff}
+  .btn-primary:hover{background:var(--brand-orange-dark)}
+  .btn-secondary{background:var(--bg);color:#3a4048;border:1px solid var(--line)}
+  .btn-secondary:hover{background:#eceff2}
+  .btn-danger{background:none;color:#b00020;padding:4px 8px;font-size:12px}
+  .list-item{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border:1px solid var(--line);
+    border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--bg)}
+  .list-item b{display:block;font-size:13.5px}
+  .list-item .meta{font-size:12px;color:#6b7480;margin-top:2px}
+  .empty{color:#8a92a0;font-size:13px;font-style:italic}
+  #status{font-size:13px;margin-bottom:10px}
+  #status.err{color:#b00020}
+  #status.ok{color:#2e7d32}
+  textarea#output{width:100%;height:260px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;white-space:pre;
+    background:#20262c;color:#e9edf1;border:none;border-radius:8px;padding:14px}
+  ol{font-size:13.5px;line-height:1.7;padding-left:20px}
+  .copied{color:#2e7d32;font-size:12.5px;margin-left:10px}
+  a{color:var(--brand-orange-dark)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="logo.png" alt="Bootsverleih Richter">
+    <div>
+      <h1>Gaststätten erfassen</h1>
+    </div>
+  </header>
+  <div class="sub">
+    Trägt eine Gaststätte in die Liste ein, die auf der <a href="index.html">Sperrkarte</a> erscheint.
+    Diese Seite speichert nichts von selbst – am Ende kopierst du den fertigen Text und fügst ihn bei
+    GitHub in <code>gaststaetten.yaml</code> ein (Anleitung ganz unten).
+  </div>
+
+  <div id="status">Lade aktuelle Liste …</div>
+
+  <div class="card">
+    <h2>Bereits eingetragen</h2>
+    <div id="liste"><div class="empty">Wird geladen …</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Neue Gaststätte hinzufügen</h2>
+
+    <label for="f-name">Name *</label>
+    <input type="text" id="f-name" placeholder="z. B. Gasthaus Zur Flussaue">
+
+    <label>Position</label>
+    <div class="radiogroup">
+      <label><input type="radio" name="posart" value="osm" checked> Automatisch bei OpenStreetMap suchen</label>
+      <label><input type="radio" name="posart" value="manuell"> Koordinaten selbst eintragen</label>
+    </div>
+    <div id="pos-osm">
+      <input type="text" id="f-osmname" placeholder="Name, so wie er bei OpenStreetMap steht">
+      <div class="hint">Findest du auf openstreetmap.org, wenn du die Gaststätte dort suchst.</div>
+    </div>
+    <div id="pos-manuell" style="display:none">
+      <div class="row2">
+        <div><input type="text" id="f-lat" placeholder="Breite, z. B. 51.86500"></div>
+        <div><input type="text" id="f-lon" placeholder="Länge, z. B. 13.97500"></div>
+      </div>
+      <div class="hint">Rechtsklick auf die Stelle in openstreetmap.org, "Adresse hier anzeigen".</div>
+    </div>
+
+    <label>Öffnungszeiten</label>
+    <div class="radiogroup">
+      <label><input type="radio" name="zeitart" value="osm" checked> Automatisch von OpenStreetMap übernehmen</label>
+      <label><input type="radio" name="zeitart" value="manuell"> Selbst eintragen</label>
+    </div>
+    <div id="zeit-manuell" style="display:none">
+      <label>Standardzeiten für alle Tage übernehmen (optional, spart Tipparbeit)</label>
+      <div class="row2" style="align-items:flex-end">
+        <div><div class="hint">Von</div><input type="time" id="f-std-von"></div>
+        <div><div class="hint">Bis</div><input type="time" id="f-std-bis"></div>
+        <div><button type="button" class="btn-secondary" onclick="applyToAllDays()">Auf alle Tage anwenden</button></div>
+      </div>
+
+      <label style="margin-top:16px">Öffnungszeiten je Wochentag</label>
+      <div id="tage-liste"></div>
+      <div class="hint">Ein Tag ohne Zeiten und ohne Häkchen bei „Ruhetag“ erscheint auf der Karte als „unbekannt“.</div>
+    </div>
+
+    <label for="f-hinweis">Hinweis (optional)</label>
+    <input type="text" id="f-hinweis" placeholder="z. B. Reservierung empfohlen">
+
+    <div style="margin-top:16px">
+      <button class="btn-primary" onclick="addEntry()">Zur Liste hinzufügen</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Fertige Datei</h2>
+    <div class="sub" style="margin-bottom:10px">Dieser Text ersetzt den kompletten Inhalt von <code>gaststaetten.yaml</code>.</div>
+    <textarea id="output" readonly></textarea>
+    <div style="margin-top:10px">
+      <button class="btn-secondary" onclick="copyOutput()">In Zwischenablage kopieren</button>
+      <span class="copied" id="copied-msg" style="display:none">Kopiert!</span>
+    </div>
+    <ol>
+      <li>Text oben kopieren.</li>
+      <li>Im GitHub-Repository die Datei <code>gaststaetten.yaml</code> öffnen.</li>
+      <li>Oben rechts auf das Stift-Symbol klicken.</li>
+      <li>Gesamten Inhalt markieren (Strg+A) und löschen, dann den kopierten Text einfügen.</li>
+      <li>Oben rechts auf „Commit changes…“ klicken und bestätigen.</li>
+      <li>Unter „Actions“ optional „Run workflow“ starten, damit die Karte sofort aktualisiert wird.</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+const REPO_RAW = 'https://raw.githubusercontent.com/Paddelmartin/spreewald-sperrkarte/main/gaststaetten.yaml';
+const HEADER = `# Gaststätten in der Nähe
+# ========================
+# Hier tragt ihr die Gaststätten ein, die auf der Karte erscheinen sollen - nur die, die für
+# euch relevant sind, nicht automatisch alle aus der Umgebung. Für jede wird täglich geprüft,
+# ob sie heute laut OpenStreetMap geöffnet hat oder Ruhetag ist.
+#
+# Diese Datei kann auch bequem über die Seite erfassen.html gepflegt werden.
+#
+# WICHTIG:
+#   - Nicht jede Gaststätte hat bei OpenStreetMap hinterlegte Öffnungszeiten, und wo doch, sind
+#     sie nicht immer aktuell. Steht auf der Karte "Öffnungszeiten unbekannt", tragt sie hier
+#     unten von Hand nach.
+#   - Ein Eintrag mit einem Fehler wird übersprungen (mit Warnung im Ablauf-Protokoll bei GitHub
+#     Actions), der Rest der Karte funktioniert trotzdem weiter.
+
+gaststaetten:
+`;
+
+let entries = [];
+
+function $(id){ return document.getElementById(id); }
+
+async function load(){
+  try{
+    const res = await fetch(REPO_RAW, {cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const text = await res.text();
+    const data = jsyaml.load(text) || {};
+    entries = data.gaststaetten || [];
+    $('status').textContent = entries.length
+      ? `Aktuelle Liste geladen: ${entries.length} Gaststätte(n).`
+      : 'Aktuelle Liste geladen, sie ist noch leer.';
+    $('status').className = 'ok';
+  }catch(err){
+    entries = [];
+    $('status').textContent = 'Konnte die aktuelle Liste nicht laden (' + err.message + '). '
+      + 'Du startest mit einer leeren Liste – bereits eingetragene Gaststätten bitte erneut hinzufügen, '
+      + 'oder die Seite neu laden und es erneut versuchen.';
+    $('status').className = 'err';
+  }
+  renderList();
+  renderOutput();
+}
+
+const TAGE = [
+  {key:'montag', kurz:'Mo'}, {key:'dienstag', kurz:'Di'}, {key:'mittwoch', kurz:'Mi'},
+  {key:'donnerstag', kurz:'Do'}, {key:'freitag', kurz:'Fr'}, {key:'samstag', kurz:'Sa'}, {key:'sonntag', kurz:'So'}
+];
+
+function buildTageZeilen(){
+  const el = $('tage-liste'); el.innerHTML = '';
+  TAGE.forEach(t=>{
+    const row = document.createElement('div'); row.className = 'tag-zeile';
+    const name = document.createElement('div'); name.className = 'tagname'; name.textContent = t.kurz;
+    const von = document.createElement('input'); von.type = 'time'; von.id = 'tag-von-'+t.key;
+    const bis = document.createElement('input'); bis.type = 'time'; bis.id = 'tag-bis-'+t.key;
+    const ruhe = document.createElement('input'); ruhe.type = 'checkbox'; ruhe.id = 'tag-ruhetag-'+t.key;
+    ruhe.addEventListener('change', ()=>{ von.disabled = ruhe.checked; bis.disabled = ruhe.checked; });
+    const ruheLabel = document.createElement('label'); ruheLabel.append(ruhe, document.createTextNode('Ruhetag'));
+    row.append(name, von, document.createTextNode('–'), bis, ruheLabel);
+    el.append(row);
+  });
+}
+
+function applyToAllDays(){
+  const von = $('f-std-von').value, bis = $('f-std-bis').value;
+  if(!von || !bis){ alert('Bitte zuerst Von und Bis für die Standardzeit eintragen.'); return; }
+  TAGE.forEach(t=>{
+    $('tag-ruhetag-'+t.key).checked = false;
+    $('tag-von-'+t.key).disabled = false; $('tag-bis-'+t.key).disabled = false;
+    $('tag-von-'+t.key).value = von; $('tag-bis-'+t.key).value = bis;
+  });
+}
+
+function zeitenZusammenfassung(zeiten){
+  if(!zeiten) return '';
+  return TAGE.map(t=>{
+    const w = zeiten[t.key];
+    if(!w) return null;
+    return t.kurz + ': ' + (String(w).toLowerCase()==='ruhetag' ? 'Ruhetag' : w);
+  }).filter(Boolean).join(' · ');
+}
+
+function renderList(){
+  const el = $('liste');
+  if(!entries.length){ el.innerHTML = '<div class="empty">Noch keine Gaststätte eingetragen.</div>'; return; }
+  el.innerHTML = '';
+  entries.forEach((e,i)=>{
+    const div = document.createElement('div'); div.className = 'list-item';
+    const left = document.createElement('div');
+    const b = document.createElement('b'); b.textContent = e.name; left.append(b);
+    const meta = document.createElement('div'); meta.className = 'meta';
+    const teile = [];
+    if(e.osm_name) teile.push('OSM: ' + e.osm_name);
+    if(e.punkt) teile.push('Koordinate: ' + e.punkt[0] + ', ' + e.punkt[1]);
+    const zeitZus = zeitenZusammenfassung(e.zeiten);
+    if(zeitZus) teile.push(zeitZus);
+    meta.textContent = teile.join(' · ') || 'Öffnungszeiten automatisch von OpenStreetMap';
+    left.append(meta);
+    const btn = document.createElement('button'); btn.className = 'btn-danger'; btn.textContent = 'Entfernen';
+    btn.onclick = () => { entries.splice(i,1); renderList(); renderOutput(); };
+    div.append(left, btn);
+    el.append(div);
+  });
+}
+
+function yamlQuote(s){
+  return '"' + String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"') + '"';
+}
+
+function renderOutput(){
+  let out = HEADER;
+  if(!entries.length){
+    out += '\n  # Eure Einträge erscheinen hier, sobald du oben welche hinzufügst.\n';
+  }
+  entries.forEach(e=>{
+    out += `  - name: ${yamlQuote(e.name)}\n`;
+    if(e.osm_name) out += `    osm_name: ${yamlQuote(e.osm_name)}\n`;
+    if(e.punkt) out += `    punkt: [${e.punkt[0]}, ${e.punkt[1]}]\n`;
+    if(e.zeiten && Object.keys(e.zeiten).length){
+      out += `    zeiten:\n`;
+      TAGE.forEach(t=>{
+        if(e.zeiten[t.key]) out += `      ${t.key}: ${yamlQuote(e.zeiten[t.key])}\n`;
+      });
+    }
+    if(e.hinweis) out += `    hinweis: ${yamlQuote(e.hinweis)}\n`;
+    out += '\n';
+  });
+  $('output').value = out;
+}
+
+function addEntry(){
+  const name = $('f-name').value.trim();
+  if(!name){ alert('Bitte einen Namen eintragen.'); return; }
+
+  const posart = document.querySelector('input[name=posart]:checked').value;
+  const entry = {name};
+  if(posart === 'osm'){
+    const osmname = $('f-osmname').value.trim();
+    if(!osmname){ alert('Bitte den Namen bei OpenStreetMap eintragen, oder Koordinaten von Hand wählen.'); return; }
+    entry.osm_name = osmname;
+  }else{
+    const lat = parseFloat($('f-lat').value.replace(',','.'));
+    const lon = parseFloat($('f-lon').value.replace(',','.'));
+    if(isNaN(lat) || isNaN(lon)){ alert('Bitte gültige Breite und Länge eintragen.'); return; }
+    entry.punkt = [lat, lon];
+  }
+
+  const zeitart = document.querySelector('input[name=zeitart]:checked').value;
+  if(zeitart === 'manuell'){
+    const zeiten = {};
+    TAGE.forEach(t=>{
+      if($('tag-ruhetag-'+t.key).checked){
+        zeiten[t.key] = 'Ruhetag';
+      }else{
+        const von = $('tag-von-'+t.key).value, bis = $('tag-bis-'+t.key).value;
+        if(von && bis) zeiten[t.key] = von + '-' + bis;
+      }
+    });
+    if(Object.keys(zeiten).length) entry.zeiten = zeiten;
+  }
+
+  const hinweis = $('f-hinweis').value.trim();
+  if(hinweis) entry.hinweis = hinweis;
+
+  entries.push(entry);
+  renderList(); renderOutput();
+
+  // Formular zuruecksetzen
+  $('f-name').value=''; $('f-osmname').value=''; $('f-lat').value=''; $('f-lon').value='';
+  $('f-hinweis').value=''; $('f-std-von').value=''; $('f-std-bis').value='';
+  TAGE.forEach(t=>{
+    $('tag-ruhetag-'+t.key).checked=false;
+    $('tag-von-'+t.key).value=''; $('tag-von-'+t.key).disabled=false;
+    $('tag-bis-'+t.key).value=''; $('tag-bis-'+t.key).disabled=false;
+  });
+  document.querySelector('input[name=posart][value=osm]').checked = true;
+  document.querySelector('input[name=zeitart][value=osm]').checked = true;
+  $('pos-osm').style.display=''; $('pos-manuell').style.display='none';
+  $('zeit-manuell').style.display='none';
+  $('f-name').focus();
+}
+
+function copyOutput(){
+  const ta = $('output'); ta.select();
+  navigator.clipboard.writeText(ta.value).then(()=>{
+    const m = $('copied-msg'); m.style.display=''; setTimeout(()=>m.style.display='none', 2000);
+  }).catch(()=>{ document.execCommand('copy'); });
+}
+
+document.querySelectorAll('input[name=posart]').forEach(r=>r.addEventListener('change', e=>{
+  $('pos-osm').style.display = e.target.value === 'osm' ? '' : 'none';
+  $('pos-manuell').style.display = e.target.value === 'manuell' ? '' : 'none';
+}));
+document.querySelectorAll('input[name=zeitart]').forEach(r=>r.addEventListener('change', e=>{
+  $('zeit-manuell').style.display = e.target.value === 'manuell' ? '' : 'none';
+}));
+
+buildTageZeilen();
+load();
+</script>
+</body>
+
+</html>

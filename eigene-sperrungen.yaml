@@ -1,0 +1,40 @@
+# Eigene Sperrungen / Hinweise
+# ==============================
+# Hier könnt ihr zusätzliche Sperrungen eintragen, die (noch) nicht auf der LBV-Seite stehen -
+# zum Beispiel einen umgestürzten Baum, den ihr heute Morgen selbst entdeckt habt.
+#
+# WICHTIG:
+#   - Diese Einträge kommen NICHT von der LBV und werden auf der Karte als "Eigener Hinweis"
+#     gekennzeichnet, damit niemand sie mit einer offiziellen LBV-Meldung verwechselt.
+#   - Ein Eintrag mit einem Fehler wird übersprungen (mit Warnung im Ablauf-Protokoll bei GitHub
+#     Actions), der Rest der Karte funktioniert trotzdem weiter.
+#   - Löscht einen Eintrag hier wieder, sobald das Hindernis beseitigt ist oder die LBV die
+#     gleiche Sperrung offiziell veröffentlicht (sonst erscheint sie doppelt).
+#   - Einrückung: nur Leerzeichen verwenden, keine Tabulatoren. Am einfachsten: einen
+#     bestehenden Eintrag kopieren und nur die Werte dahinter ändern.
+#
+# Achtet auf Punkt statt Komma bei Koordinaten, und auf Anführungszeichen bei Texten mit
+# Doppelpunkt oder Sonderzeichen.
+
+hinweise:
+
+  # --- Beispiel (durch die Rauten-Zeichen am Zeilenanfang ist es deaktiviert) ---
+  # - gewaesser: "Lehder Fließ"
+  #   bereich: "Höhe Angelsteg, kurz vor der Brücke"
+  #   von: "23.09.2026"              # Format TT.MM.JJJJ. Weglassen = ab sofort sichtbar
+  #   bis: "30.09.2026"              # Format TT.MM.JJJJ. Weglassen = "bis auf Weiteres"
+  #   status: "gesperrt"             # "gesperrt" oder "eingeschraenkt"
+  #   grund: "Umgestürzter Baum"
+  #   hinweis: "Fließ komplett versperrt, bitte Umtragen an der nächsten Brücke."
+  #   punkt: [51.86500, 13.97500]    # Breite, Länge (Rechtsklick in OpenStreetMap, "Adresse hier anzeigen")
+  #   radius_m: 150                  # wie groß der Kreis auf der Karte sein soll
+
+  # --- Beispiel für einen längeren Abschnitt statt eines einzelnen Punkts ---
+  # - gewaesser: "Beispiel-Kanal"
+  #   bereich: "zwischen Steg A und Steg B"
+  #   status: "eingeschraenkt"
+  #   grund: "Niedrigwasser"
+  #   hinweis: "Nur mit leichten Booten befahrbar."
+  #   linie: [[51.865, 13.975], [51.866, 13.977], [51.867, 13.979]]
+
+  # Eure eigenen Einträge kommen ab hier darunter:
