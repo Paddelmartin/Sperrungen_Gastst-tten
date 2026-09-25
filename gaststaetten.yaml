@@ -21,6 +21,7 @@
 gaststaetten:
   - name: "Gasthaus zum Froschkönig"
     osm_name: "Gasthaus Froschkönig"
+    punkt: [51.85585, 14.042817]
     zeiten:
       montag: "Ruhetag"
       dienstag: "Ruhetag"
@@ -33,6 +34,7 @@ gaststaetten:
 
   - name: "Gasthaus Wotschofska"
     osm_name: "Wotschofska"
+    punkt: [51.874443, 14.009345]
     zeiten:
       montag: "11:00-17:00"
       dienstag: "11:00-17:00"
@@ -55,6 +57,7 @@ gaststaetten:
 
   - name: "Gasthaus Eiche (Waldhotel Eiche)"
     osm_name: "Waldhotel Eiche"
+    punkt: [51.878322, 14.086581]
     zeiten:
       montag: "10:00-18:00"
       dienstag: "10:00-18:00"
@@ -66,6 +69,7 @@ gaststaetten:
 
   - name: "Oppott - die Stallwirtschaft"
     osm_name: "Die Stallwirtschaft im Oppott"
+    punkt: [51.863578, 13.993189]
     zeiten:
       montag: "Ruhetag"
       dienstag: "11:00-17:00"
@@ -77,6 +81,7 @@ gaststaetten:
 
   - name: "Gasthaus Kaupen Nr. 6"
     osm_name: "Kaupen"
+    punkt: [51.864648, 13.982095]
     zeiten:
       montag: "Ruhetag"
       dienstag: "Ruhetag"
@@ -88,4 +93,13 @@ gaststaetten:
 
   - name: "Cafe Venedig"
     osm_name: "Cafe Venedig"
+    punkt: [51.863186, 13.98715]
+    zeiten:
+      montag: "11:00-17:00"
+      dienstag: "11:00-17:00"
+      mittwoch: "11:00-17:00"
+      donnerstag: "11:00-17:00"
+      freitag: "11:00-17:00"
+      samstag: "11:00-17:00"
+      sonntag: "11:00-17:00"
 
