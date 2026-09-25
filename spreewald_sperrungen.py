@@ -205,8 +205,35 @@ class Geo:
         for el in self.query(ql):
             c = el if "lat" in el else el.get("center")
             if c:
-                return {"lat": c["lat"], "lon": c["lon"], "tags": el.get("tags", {})}
+                return {"lat": c["lat"], "lon": c["lon"], "tags": el.get("tags", {}),
+                        "osm": f"{el.get('type')}/{el.get('id')}"}
         return None
+
+    def poi_by_id(self, osm_id):
+        """Genau ein OSM-Objekt ('node/123', 'way/456', 'relation/789') - eindeutiger als die Namenssuche."""
+        m = re.match(r"^(node|way|relation)/(\d+)$", str(osm_id).strip())
+        if not m:
+            raise ValueError(f"osm_id '{osm_id}' hat nicht die Form node/123, way/123 oder relation/123")
+        for el in self.query(f'[out:json][timeout:60];{m.group(1)}({m.group(2)});out center tags;'):
+            c = el if "lat" in el else el.get("center")
+            if c:
+                return {"lat": c["lat"], "lon": c["lon"], "tags": el.get("tags", {}),
+                        "osm": f"{el.get('type')}/{el.get('id')}"}
+        return None
+
+    def pois_umgebung(self):
+        """Alle Gaststätten/Cafés im Spreewald, für die bei OSM Öffnungszeiten hinterlegt sind.
+        Nur für die Auswahlliste in erfassen.html - erscheinen NICHT automatisch auf der Karte."""
+        ql = ('[out:json][timeout:90];'
+              'nwr["amenity"~"^(restaurant|cafe|bar|pub|fast_food|biergarten)$"]["name"]["opening_hours"]'
+              f'({BBOX});out center tags;')
+        out = []
+        for el in self.query(ql):
+            c = el if "lat" in el else el.get("center")
+            if c:
+                out.append({"lat": c["lat"], "lon": c["lon"], "tags": el.get("tags", {}),
+                            "osm": f"{el.get('type')}/{el.get('id')}"})
+        return out
 
 
 def clip(line, anchors, radius):
@@ -450,22 +477,21 @@ def load_own_notices(path, day, lookahead):
 
 
 # ----------------------------------------------------------------------------- 6. Gaststätten (Öffnungszeiten)
+WEEKDAY_KEYS = ["montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag", "sonntag"]
 WEEKDAY_TOKENS = {"mo": 0, "tu": 1, "we": 2, "th": 3, "fr": 4, "sa": 5, "su": 6}
 TIME_RANGE = re.compile(r"^\d{1,2}:\d{2}-\d{1,2}:\d{2}$")
 
 
-def parse_opening_hours(text, weekday):
-    """Sehr einfacher Übersetzer der OpenStreetMap-Öffnungszeiten-Schreibweise (z. B. 'Mo-Fr 11:00-22:00; Tu off').
-    Gibt (status, zeiten_text, unsicher) zurück. status: 'offen' | 'ruhetag' | 'unbekannt'.
-    Bei allem, was nicht sicher verstanden wird, lieber 'unbekannt' als eine falsche Angabe zu riskieren."""
+def parse_osm_week(text):
+    """Übersetzt die OpenStreetMap-Schreibweise (z. B. 'Mo-Fr 11:00-22:00; Tu off') in eine Wochenübersicht.
+    Gibt (per_day, unsicher) zurück: per_day[0..6] = "closed" oder Liste von "HH:MM-HH:MM"; nicht
+    verstandene Tage fehlen. Bei allem Unklaren lieber 'unbekannt' als eine falsche Angabe."""
+    per_day, unsicher = {}, False
     if not text:
-        return "unbekannt", "", False
+        return per_day, False
     text = text.strip()
-    if text in ("24/7",):
-        return "offen", "durchgehend geöffnet", False
-
-    per_day = {}                                            # 0=Mo..6=So -> "closed" | Liste von "HH:MM-HH:MM" | nicht gesetzt
-    unsicher = False
+    if text == "24/7":
+        return {d: ["00:00-24:00"] for d in range(7)}, False
     for rule in text.split(";"):
         rule = rule.strip()
         if not rule:
@@ -475,8 +501,7 @@ def parse_opening_hours(text, weekday):
             unsicher = True
             continue
         day_part, time_part = m.group(1), m.group(2).strip()
-        days = []
-        ok = True
+        days, ok = [], True
         for token in day_part.split(","):
             token = token.strip()
             if "-" in token:
@@ -503,7 +528,14 @@ def parse_opening_hours(text, weekday):
             continue
         for d in days:
             per_day[d] = ranges
+    return per_day, unsicher
 
+
+def parse_opening_hours(text, weekday):
+    """Gibt (status, zeiten_text, unsicher) für einen Wochentag zurück. status: 'offen' | 'ruhetag' | 'unbekannt'."""
+    if text and text.strip() == "24/7":
+        return "offen", "durchgehend geöffnet", False
+    per_day, unsicher = parse_osm_week(text)
     if weekday not in per_day:
         return "unbekannt", "", unsicher
     if per_day[weekday] == "closed":
@@ -511,14 +543,21 @@ def parse_opening_hours(text, weekday):
     return "offen", ", ".join(r.replace("-", "–") for r in per_day[weekday]), unsicher
 
 
+def osm_week_as_zeiten(text):
+    """OSM-Öffnungszeiten im selben Format wie 'zeiten:' in gaststaetten.yaml (für erfassen.html)."""
+    per_day, unsicher = parse_osm_week(text)
+    zeiten = {}
+    for d, wert in per_day.items():
+        zeiten[WEEKDAY_KEYS[d]] = "Ruhetag" if wert == "closed" else ", ".join(wert)
+    return zeiten, unsicher
+
+
 WEEKDAY_DE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
 
-
-WEEKDAY_KEYS = ["montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag", "sonntag"]
-DAY_TIME_RANGE = re.compile(r"^\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}$")
+DAY_TIME_RANGE = re.compile(r"^\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}(\s*,\s*\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})*$")
 
 
-def load_restaurants(path, day, geo):
+def load_restaurants(path, day, geo, osm_info=None):
     """Liest die kuratierte Liste eurer Gaststätten (gaststaetten.yaml) und ermittelt für 'day', ob heute
     geöffnet, Ruhetag oder unbekannt ist. Ein fehlerhafter Eintrag wird übersprungen, nicht der ganze Lauf."""
     if not path.exists():
@@ -536,13 +575,22 @@ def load_restaurants(path, day, geo):
             hinweis = str(e.get("hinweis", "")).strip()
             punkt = e.get("punkt")
             osm_name = e.get("osm_name")
-            osm_tags = {}
-            if osm_name:
+            osm_id = e.get("osm_id")
+            osm_tags, treffer = {}, None
+            if osm_id:
+                treffer = geo.poi_by_id(osm_id)
+            elif osm_name:
                 treffer = geo.poi(osm_name)
-                if treffer:
-                    if not punkt:
-                        punkt = [treffer["lat"], treffer["lon"]]
-                    osm_tags = treffer["tags"]
+            if treffer:
+                if not punkt:
+                    punkt = [treffer["lat"], treffer["lon"]]
+                osm_tags = treffer["tags"]
+            if osm_info is not None:                          # für erfassen.html: was OSM zu diesem Eintrag weiß
+                oh = osm_tags.get("opening_hours", "")
+                woche, unsicher_w = osm_week_as_zeiten(oh)
+                osm_info[name] = {"gefunden": bool(treffer), "osm": treffer["osm"] if treffer else "",
+                                  "osm_name": osm_tags.get("name", ""), "opening_hours": oh,
+                                  "woche": woche, "unsicher": unsicher_w}
             if not punkt:
                 raise ValueError("weder 'punkt' angegeben noch über 'osm_name' bei OpenStreetMap gefunden")
 
@@ -556,7 +604,8 @@ def load_restaurants(path, day, geo):
                 elif str(wert).strip().lower() == "ruhetag":
                     status, zeiten = "ruhetag", ""
                 elif DAY_TIME_RANGE.match(str(wert).strip()):
-                    status, zeiten = "offen", str(wert).strip().replace(" ", "").replace("-", "–")
+                    status = "offen"
+                    zeiten = ", ".join(r.strip().replace(" ", "").replace("-", "–") for r in str(wert).split(","))
                 else:
                     print(f"::warning::gaststaetten.yaml, '{name}': Zeitangabe für {WEEKDAY_KEYS[weekday]} "
                           f"('{wert}') nicht erkannt, wird als unbekannt angezeigt", file=sys.stderr)
@@ -570,6 +619,27 @@ def load_restaurants(path, day, geo):
         except Exception as ex:
             print(f"::warning::gaststaetten.yaml, Eintrag {i} übersprungen ({ex})", file=sys.stderr)
     return items
+
+
+def write_restaurant_osm_data(osm_info, geo, out):
+    """Schreibt docs/gaststaetten_osm.json für erfassen.html: OSM-Öffnungszeiten der eingetragenen Gaststätten
+    und aller Gaststätten der Umgebung, die bei OSM Öffnungszeiten haben. Die Karte selbst nutzt das nicht."""
+    try:
+        umgebung = []
+        for p in geo.pois_umgebung():
+            t = p["tags"]
+            woche, unsicher = osm_week_as_zeiten(t.get("opening_hours", ""))
+            ort = t.get("addr:city") or t.get("addr:place") or t.get("addr:suburb") or ""
+            umgebung.append({"name": t.get("name", ""), "osm": p["osm"], "ort": ort,
+                             "art": t.get("amenity", ""), "lat": round(p["lat"], 6), "lon": round(p["lon"], 6),
+                             "opening_hours": t.get("opening_hours", ""), "woche": woche, "unsicher": unsicher})
+        umgebung.sort(key=lambda x: x["name"].lower())
+        data = {"erzeugt": berlin_now().strftime("%d.%m.%Y %H:%M"), "eintraege": osm_info, "umgebung": umgebung}
+        out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"OSM-Daten für erfassen.html: {len(osm_info)} eingetragene, {len(umgebung)} in der Umgebung")
+    except Exception as ex:
+        print(f"::warning::gaststaetten_osm.json nicht geschrieben ({ex}) - Karte ist davon nicht betroffen",
+              file=sys.stderr)
 
 
 def main():
@@ -609,9 +679,11 @@ def main():
     eigene = load_own_notices(HERE / "eigene-sperrungen.yaml", day, a.lookahead)
     items.extend(eigene)
 
-    gaststaetten = load_restaurants(HERE / "gaststaetten.yaml", day, geo)
+    osm_info = {}
+    gaststaetten = load_restaurants(HERE / "gaststaetten.yaml", day, geo, osm_info)
 
     render(items, gaststaetten, day, stand, a.out)
+    write_restaurant_osm_data(osm_info, geo, Path(a.out).with_name("gaststaetten_osm.json"))
     for g in gaststaetten:
         print(f"Gaststätte      {g['status']:15} {g['name']}")
     for i in items:
