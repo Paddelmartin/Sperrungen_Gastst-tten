@@ -20,7 +20,7 @@
 regeln:
   - match: "spree"
     manual:
-      - point: [52.028984, 13.889963]
+      - point: [52.028925, 13.889996]
         radius_m: 50
 
   - match: "zeitzfließ"
