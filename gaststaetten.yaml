@@ -55,7 +55,14 @@ gaststaetten:
 
   - name: "Gasthaus Eiche (Waldhotel Eiche)"
     osm_name: "Waldhotel Eiche"
-    hinweis: "Das historische Gasthaus Eiche existiert nicht mehr; heute das Waldhotel Eiche in Burg-Kauper. Bitte bestätigen, ob das gemeint ist."
+    zeiten:
+      montag: "10:00-18:00"
+      dienstag: "10:00-18:00"
+      mittwoch: "10:00-18:00"
+      donnerstag: "10:00-18:00"
+      freitag: "10:00-18:00"
+      samstag: "10:00-18:00"
+      sonntag: "10:00-18:00"
 
   - name: "Oppott - die Stallwirtschaft"
     osm_name: "Oppott"
