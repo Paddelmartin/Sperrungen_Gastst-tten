@@ -40,6 +40,8 @@
   .btn-secondary{background:var(--bg);color:#3a4048;border:1px solid var(--line)}
   .btn-secondary:hover{background:#eceff2}
   .btn-danger{background:none;color:#b00020;padding:4px 8px;font-size:12px}
+  .btn-edit{background:none;color:var(--brand-blue);padding:4px 8px;font-size:12px}
+  .item-buttons{display:flex;flex-direction:column;gap:2px;flex:none}
   .list-item{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border:1px solid var(--line);
     border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--bg)}
   .list-item b{display:block;font-size:13.5px}
@@ -245,9 +247,13 @@ function renderList(){
     if(zeitZus) teile.push(zeitZus);
     meta.textContent = teile.join(' · ') || 'Öffnungszeiten automatisch von OpenStreetMap';
     left.append(meta);
+    const buttons = document.createElement('div'); buttons.className = 'item-buttons';
+    const editBtn = document.createElement('button'); editBtn.className = 'btn-edit'; editBtn.textContent = 'Bearbeiten';
+    editBtn.onclick = () => editEntry(i);
     const btn = document.createElement('button'); btn.className = 'btn-danger'; btn.textContent = 'Entfernen';
     btn.onclick = () => { entries.splice(i,1); renderList(); renderOutput(); };
-    div.append(left, btn);
+    buttons.append(editBtn, btn);
+    div.append(left, buttons);
     el.append(div);
   });
 }
@@ -275,6 +281,20 @@ function renderOutput(){
     out += '\n';
   });
   $('output').value = out;
+}
+
+function resetForm(){
+  $('f-name').value=''; $('f-osmname').value=''; $('f-lat').value=''; $('f-lon').value='';
+  $('f-hinweis').value=''; $('f-std-von').value=''; $('f-std-bis').value='';
+  TAGE.forEach(t=>{
+    $('tag-ruhetag-'+t.key).checked=false;
+    $('tag-von-'+t.key).value=''; $('tag-von-'+t.key).disabled=false;
+    $('tag-bis-'+t.key).value=''; $('tag-bis-'+t.key).disabled=false;
+  });
+  document.querySelector('input[name=posart][value=osm]').checked = true;
+  document.querySelector('input[name=zeitart][value=osm]').checked = true;
+  $('pos-osm').style.display=''; $('pos-manuell').style.display='none';
+  $('zeit-manuell').style.display='none';
 }
 
 function addEntry(){
@@ -313,19 +333,50 @@ function addEntry(){
 
   entries.push(entry);
   renderList(); renderOutput();
+  resetForm();
+  $('f-name').focus();
+}
 
-  // Formular zuruecksetzen
-  $('f-name').value=''; $('f-osmname').value=''; $('f-lat').value=''; $('f-lon').value='';
-  $('f-hinweis').value=''; $('f-std-von').value=''; $('f-std-bis').value='';
-  TAGE.forEach(t=>{
-    $('tag-ruhetag-'+t.key).checked=false;
-    $('tag-von-'+t.key).value=''; $('tag-von-'+t.key).disabled=false;
-    $('tag-bis-'+t.key).value=''; $('tag-bis-'+t.key).disabled=false;
-  });
-  document.querySelector('input[name=posart][value=osm]').checked = true;
-  document.querySelector('input[name=zeitart][value=osm]').checked = true;
-  $('pos-osm').style.display=''; $('pos-manuell').style.display='none';
-  $('zeit-manuell').style.display='none';
+function zeitTeile(wert){
+  const m = String(wert).match(/^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})$/);
+  return m ? {von:m[1], bis:m[2]} : {von:'', bis:''};
+}
+
+function editEntry(i){
+  const e = entries[i];
+  entries.splice(i,1);          // aus der Liste nehmen, wird beim "Hinzufügen" unten wieder ergänzt
+  renderList(); renderOutput();
+
+  resetForm();
+  $('f-name').value = e.name || '';
+
+  if(e.punkt){
+    document.querySelector('input[name=posart][value=manuell]').checked = true;
+    $('pos-osm').style.display='none'; $('pos-manuell').style.display='';
+    $('f-lat').value = e.punkt[0]; $('f-lon').value = e.punkt[1];
+  }else if(e.osm_name){
+    $('f-osmname').value = e.osm_name;   // posart osm ist schon durch resetForm() vorausgewaehlt
+  }
+
+  if(e.zeiten && Object.keys(e.zeiten).length){
+    document.querySelector('input[name=zeitart][value=manuell]').checked = true;
+    $('zeit-manuell').style.display='';
+    TAGE.forEach(t=>{
+      const wert = e.zeiten[t.key];
+      if(!wert) return;
+      if(String(wert).toLowerCase()==='ruhetag'){
+        $('tag-ruhetag-'+t.key).checked = true;
+        $('tag-von-'+t.key).disabled = true; $('tag-bis-'+t.key).disabled = true;
+      }else{
+        const {von,bis} = zeitTeile(wert);
+        $('tag-von-'+t.key).value = von; $('tag-bis-'+t.key).value = bis;
+      }
+    });
+  }
+
+  $('f-hinweis').value = e.hinweis || '';
+
+  $('f-name').scrollIntoView({behavior:'smooth', block:'center'});
   $('f-name').focus();
 }
 
