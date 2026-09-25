@@ -3,401 +3,720 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gaststätten erfassen | Bootsverleih Richter</title>
+<title>Gaststätten pflegen | Bootsverleih Richter</title>
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
 <style>
   :root{ --brand-orange:#EC6D28; --brand-orange-dark:#D25A1B; --brand-blue:#0F63A6; --brand-blue-dark:#0B4C80;
-    --bg:#F5F7FA; --card:#fff; --line:#E1E6EC; }
+    --bg:#F5F7FA; --card:#fff; --line:#E1E6EC; --ok:#2e7d32; --err:#b00020; }
   html,body{margin:0;font-family:'Poppins',system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:#2b2f33}
-  .wrap{max-width:720px;margin:0 auto;padding:20px 16px 60px}
+  .wrap{max-width:720px;margin:0 auto;padding:20px 16px 110px}
   header{display:flex;align-items:center;gap:12px;margin-bottom:6px}
   header img{height:40px}
   h1{font-size:19px;color:var(--brand-blue-dark);margin:0}
-  .sub{color:#6b7480;font-size:13px;margin-bottom:20px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:18px;
-    box-shadow:0 1px 3px rgba(20,30,40,.05)}
+  .sub{color:#6b7480;font-size:13px;margin-bottom:20px;line-height:1.55}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:18px}
   .card h2{font-size:15px;color:var(--brand-blue-dark);margin:0 0 12px}
+  .card.editing{border-color:var(--brand-orange);box-shadow:0 0 0 2px rgba(236,109,40,.18)}
   label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px;color:#3a4048}
-  label.inline{display:inline-flex;align-items:center;gap:5px;font-weight:400;margin:4px 10px 4px 0}
-  input[type=text],input[type=number],textarea{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--line);
-    border-radius:6px;font-family:inherit;font-size:13.5px}
-  textarea{resize:vertical}
-  .hint{font-size:11.5px;color:#8a92a0;margin-top:3px}
+  input[type=text],input[type=password],input[type=search],textarea{width:100%;box-sizing:border-box;padding:8px 10px;
+    border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:13.5px}
+  input:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--brand-blue);outline-offset:2px}
+  .hint{font-size:11.5px;color:#8a92a0;margin-top:3px;line-height:1.5}
   .radiogroup{display:flex;gap:16px;margin-top:4px;flex-wrap:wrap}
   .radiogroup label{display:flex;align-items:center;gap:6px;font-weight:400;margin:0}
-  .row2{display:flex;gap:10px}
-  .row2>div{flex:1}
-  .tag-zeile{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+  .row2{display:flex;gap:10px;flex-wrap:wrap}
+  .row2>div{flex:1;min-width:120px}
+  .tag-zeile{display:flex;align-items:center;gap:6px 8px;padding:7px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
   .tag-zeile:last-child{border-bottom:none}
-  .tag-zeile .tagname{width:92px;flex:none;font-size:13px;font-weight:600;color:#3a4048}
-  .tag-zeile input[type=time]{width:110px}
+  .tag-zeile .tagname{width:34px;flex:none;font-size:13px;font-weight:600;color:#3a4048}
+  .tag-zeile input[type=time]{width:104px}
   .tag-zeile label{display:flex;align-items:center;gap:5px;font-weight:400;margin:0;font-size:12.5px;white-space:nowrap}
+  .tag-zeile .zweite{display:none;align-items:center;gap:6px}
+  .tag-zeile.mit-zweiter .zweite{display:flex}
+  .tag-zeile.mit-zweiter .btn-zweite{display:none}
   button{font-family:inherit;font-size:13.5px;font-weight:600;border:none;border-radius:7px;padding:9px 16px;cursor:pointer}
+  button:disabled{opacity:.5;cursor:default}
   .btn-primary{background:var(--brand-orange);color:#fff}
-  .btn-primary:hover{background:var(--brand-orange-dark)}
+  .btn-primary:hover:not(:disabled){background:var(--brand-orange-dark)}
+  .btn-blue{background:var(--brand-blue);color:#fff}
+  .btn-blue:hover:not(:disabled){background:var(--brand-blue-dark)}
   .btn-secondary{background:var(--bg);color:#3a4048;border:1px solid var(--line)}
-  .btn-secondary:hover{background:#eceff2}
-  .btn-danger{background:none;color:#b00020;padding:4px 8px;font-size:12px}
-  .btn-edit{background:none;color:var(--brand-blue);padding:4px 8px;font-size:12px}
+  .btn-secondary:hover:not(:disabled){background:#eceff2}
+  .btn-link{background:none;color:var(--brand-blue);padding:4px 8px;font-size:12px}
+  .btn-danger{background:none;color:var(--err);padding:4px 8px;font-size:12px}
+  .btn-klein{padding:3px 8px;font-size:11.5px;font-weight:400}
   .item-buttons{display:flex;flex-direction:column;gap:2px;flex:none}
   .list-item{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border:1px solid var(--line);
     border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--bg)}
+  .list-item.aktiv{border-color:var(--brand-orange);background:#FFF6F0}
   .list-item b{display:block;font-size:13.5px}
-  .list-item .meta{font-size:12px;color:#6b7480;margin-top:2px}
+  .list-item .meta{font-size:12px;color:#6b7480;margin-top:2px;line-height:1.5}
+  .list-item .osm{font-size:12px;color:var(--brand-blue-dark);margin-top:3px;line-height:1.5}
+  .list-item .warnzeile{font-size:12px;color:#9a5b00;margin-top:3px}
   .empty{color:#8a92a0;font-size:13px;font-style:italic}
-  #status{font-size:13px;margin-bottom:10px}
-  #status.err{color:#b00020}
-  #status.ok{color:#2e7d32}
-  textarea#output{width:100%;height:260px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;white-space:pre;
-    background:#20262c;color:#e9edf1;border:none;border-radius:8px;padding:14px}
-  ol{font-size:13.5px;line-height:1.7;padding-left:20px}
-  .copied{color:#2e7d32;font-size:12.5px;margin-left:10px}
+  #status{font-size:13px;margin-bottom:12px}
+  #status.err{color:var(--err)} #status.ok{color:var(--ok)}
+  .osmbox{background:#EEF5FB;border:1px solid #CFE2F2;border-radius:7px;padding:8px 10px;font-size:12.5px;margin-top:6px;
+    display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .osmbox a{color:var(--brand-blue-dark)}
+  #osm-zeiten-hinweis{font-size:12.5px;margin:10px 0 4px;color:var(--brand-blue-dark)}
+  .form-buttons{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap}
+  #osm-liste{max-height:420px;overflow-y:auto;margin-top:10px}
+  .schon{font-size:11.5px;color:var(--ok);font-weight:600;white-space:nowrap;padding-top:4px}
+  .savebar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);
+    box-shadow:0 -2px 8px rgba(20,30,40,.06);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
+  .savebar .inner{max-width:720px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  #save-info{font-size:13px;color:#6b7480}
+  #save-info.dirty{color:#9a5b00;font-weight:600}
+  #save-info.ok{color:var(--ok)} #save-info.err{color:var(--err);font-weight:600}
+  details{margin-top:4px}
+  summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--brand-blue-dark);padding:4px 0}
+  details ol{font-size:13px;line-height:1.7;padding-left:20px;margin:8px 0}
+  textarea#output{height:240px;font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:pre;
+    background:#20262c;color:#e9edf1;border:none;border-radius:8px;padding:12px}
+  #token-status{font-size:12.5px;margin-top:8px}
   a{color:var(--brand-orange-dark)}
+  code{font-size:12px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <img src="logo.png" alt="Bootsverleih Richter">
-    <div>
-      <h1>Gaststätten erfassen</h1>
-    </div>
+    <h1>Gaststätten pflegen</h1>
   </header>
   <div class="sub">
-    Trägt eine Gaststätte in die Liste ein, die auf der <a href="index.html">Sperrkarte</a> erscheint.
-    Diese Seite speichert nichts von selbst – am Ende kopierst du den fertigen Text und fügst ihn bei
-    GitHub in <code>gaststaetten.yaml</code> ein (Anleitung ganz unten).
+    Hier legt ihr fest, welche Gaststätten auf der <a href="index.html">Sperrkarte</a> erscheinen und mit welchen
+    Öffnungszeiten. Änderungen werden erst mit „Bei GitHub speichern“ übernommen; die Karte baut sich danach in
+    wenigen Minuten neu.
   </div>
 
   <div id="status">Lade aktuelle Liste …</div>
 
   <div class="card">
-    <h2>Bereits eingetragen</h2>
+    <h2>Auf der Karte</h2>
     <div id="liste"><div class="empty">Wird geladen …</div></div>
   </div>
 
-  <div class="card">
-    <h2>Neue Gaststätte hinzufügen</h2>
+  <div class="card" id="form-card">
+    <h2 id="form-titel">Neue Gaststätte hinzufügen</h2>
 
-    <label for="f-name">Name *</label>
+    <label for="f-name">Name, wie er auf der Karte stehen soll *</label>
     <input type="text" id="f-name" placeholder="z. B. Gasthaus Zur Flussaue">
 
     <label>Position</label>
     <div class="radiogroup">
-      <label><input type="radio" name="posart" value="osm" checked> Automatisch bei OpenStreetMap suchen</label>
+      <label><input type="radio" name="posart" value="osm" checked> Von OpenStreetMap</label>
       <label><input type="radio" name="posart" value="manuell"> Koordinaten selbst eintragen</label>
     </div>
     <div id="pos-osm">
-      <input type="text" id="f-osmname" placeholder="Name, so wie er bei OpenStreetMap steht">
-      <div class="hint">Findest du auf openstreetmap.org, wenn du die Gaststätte dort suchst.</div>
+      <div id="osm-verknuepft" class="osmbox" style="display:none">
+        <span>Fest verknüpft mit <a id="osm-link" target="_blank" rel="noopener"></a></span>
+        <button type="button" class="btn-link" onclick="loeseVerknuepfung()">Verknüpfung lösen</button>
+      </div>
+      <div id="osm-namensuche">
+        <input type="text" id="f-osmname" placeholder="Name, so wie er bei OpenStreetMap steht" style="margin-top:6px">
+        <div class="hint">Einfacher: unten unter „Gaststätten aus OpenStreetMap“ suchen und übernehmen.</div>
+      </div>
     </div>
     <div id="pos-manuell" style="display:none">
-      <div class="row2">
+      <div class="row2" style="margin-top:6px">
         <div><input type="text" id="f-lat" placeholder="Breite, z. B. 51.86500"></div>
         <div><input type="text" id="f-lon" placeholder="Länge, z. B. 13.97500"></div>
       </div>
-      <div class="hint">Rechtsklick auf die Stelle in openstreetmap.org, "Adresse hier anzeigen".</div>
+      <div class="hint">Rechtsklick auf die Stelle in openstreetmap.org, „Adresse hier anzeigen“.</div>
     </div>
 
     <label>Öffnungszeiten</label>
     <div class="radiogroup">
-      <label><input type="radio" name="zeitart" value="osm" checked> Automatisch von OpenStreetMap übernehmen</label>
-      <label><input type="radio" name="zeitart" value="manuell"> Selbst eintragen</label>
+      <label><input type="radio" name="zeitart" value="osm" checked> Automatisch von OpenStreetMap</label>
+      <label><input type="radio" name="zeitart" value="manuell"> Selbst festlegen</label>
     </div>
+    <div id="osm-zeiten-hinweis"></div>
     <div id="zeit-manuell" style="display:none">
-      <label>Standardzeiten für alle Tage übernehmen (optional, spart Tipparbeit)</label>
-      <div class="row2" style="align-items:flex-end">
+      <div class="row2" style="align-items:flex-end;margin-top:10px">
         <div><div class="hint">Von</div><input type="time" id="f-std-von"></div>
         <div><div class="hint">Bis</div><input type="time" id="f-std-bis"></div>
         <div><button type="button" class="btn-secondary" onclick="applyToAllDays()">Auf alle Tage anwenden</button></div>
       </div>
-
-      <label style="margin-top:16px">Öffnungszeiten je Wochentag</label>
+      <div style="margin-top:10px" id="osm-uebernehmen-wrap">
+        <button type="button" class="btn-secondary" onclick="osmZeitenInsFormular(true)">Zeiten von OpenStreetMap einsetzen</button>
+      </div>
+      <label style="margin-top:14px">Je Wochentag</label>
       <div id="tage-liste"></div>
-      <div class="hint">Ein Tag ohne Zeiten und ohne Häkchen bei „Ruhetag“ erscheint auf der Karte als „unbekannt“.</div>
+      <div class="hint">„+ Pause“ für geteilte Zeiten (z. B. 11–14 und 17–22 Uhr). Ein Tag ohne Zeiten und ohne
+        „Ruhetag“ erscheint auf der Karte als „unbekannt“.</div>
     </div>
 
     <label for="f-hinweis">Hinweis (optional)</label>
-    <input type="text" id="f-hinweis" placeholder="z. B. Reservierung empfohlen">
+    <input type="text" id="f-hinweis" placeholder="z. B. Saisonal April–Oktober, Reservierung empfohlen">
 
-    <div style="margin-top:16px">
-      <button class="btn-primary" onclick="addEntry()">Zur Liste hinzufügen</button>
+    <div class="form-buttons">
+      <button class="btn-primary" id="btn-form" onclick="formUebernehmen()">Zur Liste hinzufügen</button>
+      <button class="btn-secondary" id="btn-abbrechen" onclick="bearbeitenAbbrechen()" style="display:none">Abbrechen</button>
     </div>
   </div>
 
   <div class="card">
-    <h2>Fertige Datei</h2>
-    <div class="sub" style="margin-bottom:10px">Dieser Text ersetzt den kompletten Inhalt von <code>gaststaetten.yaml</code>.</div>
-    <textarea id="output" readonly></textarea>
-    <div style="margin-top:10px">
-      <button class="btn-secondary" onclick="copyOutput()">In Zwischenablage kopieren</button>
-      <span class="copied" id="copied-msg" style="display:none">Kopiert!</span>
-    </div>
-    <ol>
-      <li>Text oben kopieren.</li>
-      <li>Im GitHub-Repository die Datei <code>gaststaetten.yaml</code> öffnen.</li>
-      <li>Oben rechts auf das Stift-Symbol klicken.</li>
-      <li>Gesamten Inhalt markieren (Strg+A) und löschen, dann den kopierten Text einfügen.</li>
-      <li>Oben rechts auf „Commit changes…“ klicken und bestätigen.</li>
-      <li>Unter „Actions“ optional „Run workflow“ starten, damit die Karte sofort aktualisiert wird.</li>
-    </ol>
+    <h2>Gaststätten aus OpenStreetMap</h2>
+    <div class="sub" style="margin-bottom:8px">Alle Gaststätten im Spreewald, für die bei OpenStreetMap Öffnungszeiten
+      hinterlegt sind. Sie erscheinen erst auf der Karte, wenn ihr sie übernehmt und speichert.</div>
+    <input type="search" id="osm-suche" placeholder="Suchen nach Name oder Ort, z. B. Lehde" oninput="renderOsmListe()">
+    <div id="osm-liste"><div class="empty">Wird geladen …</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Speichern einrichten</h2>
+    <div class="sub" style="margin-bottom:6px">Einmal pro Gerät nötig. Der Zugangsschlüssel bleibt nur in diesem Browser
+      gespeichert. Richtet das nur auf euren eigenen Geräten ein.</div>
+    <details id="token-details">
+      <summary id="token-summary">Zugangsschlüssel eintragen</summary>
+      <ol>
+        <li>Bei GitHub angemeldet <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">diese Seite öffnen</a>
+          (Settings → Developer settings → Fine-grained tokens → Generate new token).</li>
+        <li>Name z. B. „Gaststätten pflegen“, Ablaufdatum nach Wunsch (z. B. 1 Jahr).</li>
+        <li>Repository access: <b>Only select repositories</b> → <code id="repo-name-hilfe"></code>.</li>
+        <li>Permissions → Repository permissions → <b>Contents: Read and write</b>. Sonst nichts.</li>
+        <li>„Generate token“, den angezeigten Schlüssel kopieren und hier einfügen.</li>
+      </ol>
+      <input type="password" id="f-token" placeholder="github_pat_…" autocomplete="off">
+      <div class="form-buttons" style="margin-top:10px">
+        <button class="btn-blue" onclick="tokenSpeichern()">Schlüssel prüfen und merken</button>
+        <button class="btn-secondary" onclick="tokenEntfernen()">Von diesem Gerät entfernen</button>
+      </div>
+      <div id="token-status"></div>
+    </details>
+    <details>
+      <summary>Ohne Zugangsschlüssel: Text kopieren und selbst einfügen</summary>
+      <textarea id="output" readonly></textarea>
+      <div style="margin-top:8px"><button class="btn-secondary" onclick="copyOutput()">In Zwischenablage kopieren</button>
+        <span id="copied-msg" style="display:none;color:var(--ok);font-size:12.5px;margin-left:8px">Kopiert</span></div>
+      <ol>
+        <li>Bei GitHub die Datei <code>gaststaetten.yaml</code> öffnen, Stift-Symbol klicken.</li>
+        <li>Alles markieren (Strg+A), löschen, kopierten Text einfügen, „Commit changes…“.</li>
+      </ol>
+    </details>
   </div>
 </div>
 
+<div class="savebar"><div class="inner">
+  <span id="save-info">Alles gespeichert.</span>
+  <button class="btn-primary" id="btn-save" onclick="speichern()" disabled>Bei GitHub speichern</button>
+</div></div>
+
 <script>
-const REPO_RAW = 'https://raw.githubusercontent.com/Paddelmartin/spreewald-sperrkarte/main/gaststaetten.yaml';
+// ---------------------------------------------------------------- Einstellungen
+// Repository wird aus der Adresse der Seite abgeleitet (…github.io/<repo>/erfassen.html), Rückfall unten.
+const REPO = (()=>{
+  const h = location.hostname, teile = location.pathname.split('/').filter(Boolean);
+  if(h.endsWith('.github.io') && teile.length) return h.split('.')[0] + '/' + teile[0];
+  return 'Paddelmartin/Sperrungen_Gastst-tten';
+})();
+const BRANCH = 'main', DATEI = 'gaststaetten.yaml';
+const API = `https://api.github.com/repos/${REPO}/contents/${DATEI}`;
+const RAW = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/${DATEI}`;
+const TOKEN_KEY = 'sperrkarte_github_token';
+
 const HEADER = `# Gaststätten in der Nähe
 # ========================
 # Hier tragt ihr die Gaststätten ein, die auf der Karte erscheinen sollen - nur die, die für
 # euch relevant sind, nicht automatisch alle aus der Umgebung. Für jede wird täglich geprüft,
-# ob sie heute laut OpenStreetMap geöffnet hat oder Ruhetag ist.
+# ob sie heute geöffnet hat oder Ruhetag ist.
 #
-# Diese Datei kann auch bequem über die Seite erfassen.html gepflegt werden.
+# Diese Datei wird am bequemsten über die Seite erfassen.html gepflegt (dort auch Speichern).
 #
-# WICHTIG:
-#   - Nicht jede Gaststätte hat bei OpenStreetMap hinterlegte Öffnungszeiten, und wo doch, sind
-#     sie nicht immer aktuell. Steht auf der Karte "Öffnungszeiten unbekannt", tragt sie hier
-#     unten von Hand nach.
-#   - Ein Eintrag mit einem Fehler wird übersprungen (mit Warnung im Ablauf-Protokoll bei GitHub
-#     Actions), der Rest der Karte funktioniert trotzdem weiter.
+# Felder je Gaststätte:
+#   name      Anzeigename auf der Karte
+#   osm_id    feste Verknüpfung mit einem OpenStreetMap-Objekt (z. B. "node/123456") - am genauesten
+#   osm_name  sonst: Suche bei OpenStreetMap nach diesem Namen
+#   punkt     sonst: Koordinate von Hand [Breite, Länge]
+#   zeiten    Öffnungszeiten von Hand je Wochentag, haben Vorrang vor OpenStreetMap
+#             ("11:00-20:00", geteilt "11:00-14:00, 17:00-22:00" oder "Ruhetag")
+#   hinweis   freier Zusatztext
+#
+# Ein Eintrag mit einem Fehler wird übersprungen (Warnung im Ablauf-Protokoll bei GitHub Actions),
+# der Rest der Karte funktioniert trotzdem weiter.
 
 gaststaetten:
 `;
-
-let entries = [];
-
-function $(id){ return document.getElementById(id); }
-
-async function load(){
-  try{
-    const res = await fetch(REPO_RAW, {cache:'no-store'});
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const text = await res.text();
-    const data = jsyaml.load(text) || {};
-    entries = data.gaststaetten || [];
-    $('status').textContent = entries.length
-      ? `Aktuelle Liste geladen: ${entries.length} Gaststätte(n).`
-      : 'Aktuelle Liste geladen, sie ist noch leer.';
-    $('status').className = 'ok';
-  }catch(err){
-    entries = [];
-    $('status').textContent = 'Konnte die aktuelle Liste nicht laden (' + err.message + '). '
-      + 'Du startest mit einer leeren Liste – bereits eingetragene Gaststätten bitte erneut hinzufügen, '
-      + 'oder die Seite neu laden und es erneut versuchen.';
-    $('status').className = 'err';
-  }
-  renderList();
-  renderOutput();
-}
 
 const TAGE = [
   {key:'montag', kurz:'Mo'}, {key:'dienstag', kurz:'Di'}, {key:'mittwoch', kurz:'Mi'},
   {key:'donnerstag', kurz:'Do'}, {key:'freitag', kurz:'Fr'}, {key:'samstag', kurz:'Sa'}, {key:'sonntag', kurz:'So'}
 ];
+const BEKANNTE_FELDER = ['name','osm_id','osm_name','punkt','zeiten','hinweis'];
 
-function buildTageZeilen(){
-  const el = $('tage-liste'); el.innerHTML = '';
-  TAGE.forEach(t=>{
-    const row = document.createElement('div'); row.className = 'tag-zeile';
-    const name = document.createElement('div'); name.className = 'tagname'; name.textContent = t.kurz;
-    const von = document.createElement('input'); von.type = 'time'; von.id = 'tag-von-'+t.key;
-    const bis = document.createElement('input'); bis.type = 'time'; bis.id = 'tag-bis-'+t.key;
-    const ruhe = document.createElement('input'); ruhe.type = 'checkbox'; ruhe.id = 'tag-ruhetag-'+t.key;
-    ruhe.addEventListener('change', ()=>{ von.disabled = ruhe.checked; bis.disabled = ruhe.checked; });
-    const ruheLabel = document.createElement('label'); ruheLabel.append(ruhe, document.createTextNode('Ruhetag'));
-    row.append(name, von, document.createTextNode('–'), bis, ruheLabel);
-    el.append(row);
+// ---------------------------------------------------------------- Zustand
+let entries = [];            // aktuelle Liste (so, wie sie gespeichert würde)
+let gespeicherterText = '';  // Stand bei GitHub (zum Erkennen ungespeicherter Änderungen)
+let sha = null;              // Versionskennung der Datei bei GitHub (nötig zum Speichern)
+let editIndex = null;        // null = neuer Eintrag, sonst Index in entries
+let formOsmId = '';          // feste OSM-Verknüpfung des Formulars
+let formOsmWoche = null;     // OSM-Öffnungszeiten zum aktuellen Formular (falls bekannt)
+let osmDaten = null;         // docs/gaststaetten_osm.json
+
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls;
+  if(text != null) e.textContent = text; return e; };
+const token = () => { try{ return localStorage.getItem(TOKEN_KEY) || ''; }catch(_){ return ''; } };
+
+// ---------------------------------------------------------------- Laden
+function b64ZuText(b64){
+  const bin = atob(b64.replace(/\s/g,''));
+  return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+}
+function textZuB64(text){
+  const bytes = new TextEncoder().encode(text); let bin = '';
+  for(let i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function apiHeaders(){
+  const h = {'Accept':'application/vnd.github+json'};
+  if(token()) h['Authorization'] = 'Bearer ' + token();
+  return h;
+}
+
+async function ladeDatei(){
+  // Über die GitHub-Schnittstelle: immer aktuell und liefert die Versionskennung fürs Speichern.
+  try{
+    const res = await fetch(`${API}?ref=${BRANCH}`, {headers: apiHeaders(), cache:'no-store'});
+    if(res.status === 404) return {text:'', sha:null};
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const js = await res.json();
+    return {text: b64ZuText(js.content), sha: js.sha};
+  }catch(err){
+    // Rückfall (z. B. Abfragegrenze erreicht): Rohdatei, dann ohne Versionskennung
+    const res = await fetch(RAW + '?t=' + Date.now(), {cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    return {text: await res.text(), sha: null};
+  }
+}
+
+async function load(){
+  $('status').textContent = 'Lade aktuelle Liste …'; $('status').className = '';
+  try{
+    const d = await ladeDatei();
+    const data = jsyaml.load(d.text) || {};
+    entries = Array.isArray(data.gaststaetten) ? data.gaststaetten : [];
+    sha = d.sha;
+    gespeicherterText = renderYaml(entries);
+    $('status').textContent = entries.length
+      ? `${entries.length} Gaststätte(n) geladen aus ${REPO}.`
+      : `Die Liste in ${REPO} ist noch leer.`;
+    $('status').className = 'ok';
+  }catch(err){
+    entries = []; gespeicherterText = renderYaml(entries);
+    $('status').textContent = `Die aktuelle Liste konnte nicht geladen werden (${err.message}). `
+      + 'Bitte Seite neu laden. Solange nichts geladen ist, lässt sich auch nichts speichern.';
+    $('status').className = 'err';
+  }
+  aktualisiere();
+}
+
+async function ladeOsmDaten(){
+  try{
+    const res = await fetch('gaststaetten_osm.json?t=' + Date.now(), {cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    osmDaten = await res.json();
+  }catch(_){ osmDaten = null; }
+  renderList(); renderOsmListe(); zeigeOsmZeitenHinweis();
+}
+
+// ---------------------------------------------------------------- Hilfen Öffnungszeiten
+function zeitenKurz(zeiten){
+  if(!zeiten) return '';
+  // gleiche aufeinanderfolgende Tage zusammenfassen: "Mo–Fr 11:00-22:00, Sa Ruhetag"
+  const werte = TAGE.map(t => zeiten[t.key] ? String(zeiten[t.key]) : null);
+  const gruppen = [];
+  werte.forEach((w,i)=>{
+    const letzte = gruppen[gruppen.length-1];
+    if(letzte && letzte.w === w) letzte.bis = i; else gruppen.push({von:i, bis:i, w});
+  });
+  return gruppen.filter(g=>g.w!==null).map(g=>{
+    const tage = g.von===g.bis ? TAGE[g.von].kurz : TAGE[g.von].kurz + '–' + TAGE[g.bis].kurz;
+    return tage + ' ' + (g.w.toLowerCase()==='ruhetag' ? 'Ruhetag' : g.w);
+  }).join(' · ');
+}
+function osmZuEintrag(e){
+  if(!osmDaten || !osmDaten.eintraege) return null;
+  return osmDaten.eintraege[e.name] || null;
+}
+function osmLink(osmId){
+  return /^(node|way|relation)\/\d+$/.test(osmId) ? 'https://www.openstreetmap.org/' + osmId : null;
+}
+
+// ---------------------------------------------------------------- Liste der eingetragenen Gaststätten
+function renderList(){
+  const box = $('liste'); box.textContent = '';
+  if(!entries.length){ box.append(el('div','empty','Noch keine Gaststätte eingetragen.')); return; }
+  entries.forEach((e,i)=>{
+    const item = el('div', 'list-item' + (i===editIndex ? ' aktiv' : ''));
+    const left = el('div');
+    left.append(el('b', null, e.name));
+    const pos = e.punkt ? `Koordinate ${e.punkt[0]}, ${e.punkt[1]}`
+      : e.osm_id ? 'Position: fest verknüpft mit OpenStreetMap'
+      : e.osm_name ? `Position: OSM-Suche „${e.osm_name}“` : 'Keine Position';
+    left.append(el('div','meta', pos));
+
+    const info = osmZuEintrag(e);
+    const osmWoche = info && Object.keys(info.woche||{}).length ? zeitenKurz(info.woche) : '';
+    if(e.zeiten && Object.keys(e.zeiten).length){
+      left.append(el('div','meta','Eigene Zeiten: ' + zeitenKurz(e.zeiten)));
+      if(osmWoche) left.append(el('div','osm','OpenStreetMap sagt: ' + osmWoche));
+    }else if(info && !info.gefunden && !e.punkt){
+      left.append(el('div','warnzeile','Beim letzten Lauf bei OpenStreetMap nicht gefunden – erscheint nicht auf der Karte.'));
+    }else if(osmWoche){
+      left.append(el('div','osm','Zeiten von OpenStreetMap: ' + osmWoche + (info.unsicher ? ' (teilweise unklar)' : '')));
+    }else if(info){
+      left.append(el('div','warnzeile','Bei OpenStreetMap keine Öffnungszeiten – auf der Karte „unbekannt“.'));
+    }else{
+      left.append(el('div','meta','Zeiten automatisch von OpenStreetMap'));
+    }
+    if(e.hinweis) left.append(el('div','meta', e.hinweis));
+
+    const buttons = el('div','item-buttons');
+    const b1 = el('button','btn-link','Bearbeiten'); b1.onclick = () => editEntry(i);
+    const b2 = el('button','btn-danger','Entfernen');
+    b2.onclick = () => {
+      if(!confirm(`„${e.name}“ von der Karte entfernen?`)) return;
+      if(editIndex === i) bearbeitenAbbrechen(); else if(editIndex !== null && editIndex > i) editIndex--;
+      entries.splice(i,1); aktualisiere();
+    };
+    buttons.append(b1, b2);
+    item.append(left, buttons); box.append(item);
   });
 }
 
+// ---------------------------------------------------------------- OSM-Umgebungsliste
+function renderOsmListe(){
+  const box = $('osm-liste'); box.textContent = '';
+  if(!osmDaten){
+    box.append(el('div','empty','Die Liste entsteht beim nächsten Lauf der Karte (unter „Actions“ auch sofort startbar).'));
+    return;
+  }
+  const alle = osmDaten.umgebung || [];
+  const q = $('osm-suche').value.trim().toLowerCase();
+  const treffer = alle.filter(p => !q || (p.name + ' ' + p.ort).toLowerCase().includes(q));
+  const verknuepft = new Set(entries.map(e => e.osm_id).filter(Boolean));
+  Object.entries(osmDaten.eintraege || {}).forEach(([n,info]) => {
+    if(info.osm && entries.some(e => e.name === n)) verknuepft.add(info.osm);
+  });
+  if(!treffer.length){ box.append(el('div','empty', q ? 'Nichts gefunden.' : 'Keine Einträge.')); return; }
+  const MAX = 60;
+  treffer.slice(0, MAX).forEach(p=>{
+    const item = el('div','list-item');
+    const left = el('div');
+    left.append(el('b', null, p.name));
+    left.append(el('div','meta', [p.ort, artText(p.art)].filter(Boolean).join(', ')));
+    left.append(el('div','osm', zeitenKurz(p.woche) || p.opening_hours));
+    item.append(left);
+    if(verknuepft.has(p.osm)){
+      item.append(el('span','schon','schon auf der Karte'));
+    }else{
+      const b = el('button','btn-link','Übernehmen'); b.onclick = () => osmUebernehmen(p);
+      item.append(b);
+    }
+    box.append(item);
+  });
+  if(treffer.length > MAX) box.append(el('div','hint', `… und ${treffer.length - MAX} weitere. Suchbegriff eingeben, um einzugrenzen.`));
+}
+function artText(a){
+  return {restaurant:'Restaurant', cafe:'Café', bar:'Bar', pub:'Kneipe', fast_food:'Imbiss', biergarten:'Biergarten'}[a] || '';
+}
+function osmUebernehmen(p){
+  if(!formVerwerfenOk()) return;
+  resetForm();
+  $('f-name').value = p.name;
+  formOsmId = p.osm; formOsmWoche = p.woche || null;
+  zeigePosition();
+  osmZeitenInsFormular(false);          // Zeiten schon eintragen, falls ihr gleich anpassen wollt
+  zeigeOsmZeitenHinweis();
+  $('form-card').scrollIntoView({behavior:'smooth', block:'start'});
+  $('f-name').focus();
+}
+
+// ---------------------------------------------------------------- Formular
+function buildTageZeilen(){
+  const box = $('tage-liste'); box.textContent = '';
+  TAGE.forEach(t=>{
+    const row = el('div','tag-zeile'); row.id = 'zeile-' + t.key;
+    const zeit = id => { const i = document.createElement('input'); i.type = 'time'; i.id = id; return i; };
+    const von = zeit('tag-von-'+t.key), bis = zeit('tag-bis-'+t.key);
+    const von2 = zeit('tag-von2-'+t.key), bis2 = zeit('tag-bis2-'+t.key);
+    const zweite = el('span','zweite'); zweite.append(document.createTextNode('und'), von2, document.createTextNode('–'), bis2);
+    const plus = el('button','btn-secondary btn-klein btn-zweite','+ Pause'); plus.type = 'button';
+    plus.onclick = () => { row.classList.add('mit-zweiter'); von2.focus(); };
+    const ruhe = document.createElement('input'); ruhe.type = 'checkbox'; ruhe.id = 'tag-ruhetag-'+t.key;
+    ruhe.addEventListener('change', ()=> setRuhetag(t.key, ruhe.checked));
+    const ruheLabel = el('label'); ruheLabel.append(ruhe, document.createTextNode('Ruhetag'));
+    row.append(el('div','tagname',t.kurz), von, document.createTextNode('–'), bis, zweite, plus, ruheLabel);
+    box.append(row);
+  });
+}
+function setRuhetag(key, an){
+  $('tag-ruhetag-'+key).checked = an;
+  ['von','bis','von2','bis2'].forEach(f => $(`tag-${f}-${key}`).disabled = an);
+}
+function setTag(key, wert){
+  ['von','bis','von2','bis2'].forEach(f => $(`tag-${f}-${key}`).value = '');
+  $('zeile-'+key).classList.remove('mit-zweiter');
+  setRuhetag(key, false);
+  if(!wert) return;
+  if(String(wert).trim().toLowerCase() === 'ruhetag'){ setRuhetag(key, true); return; }
+  const teile = String(wert).split(',').map(s => s.trim().match(/^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})$/)).filter(Boolean);
+  const hh = s => s.padStart(5,'0').replace('24:00','23:59');
+  if(teile[0]){ $('tag-von-'+key).value = hh(teile[0][1]); $('tag-bis-'+key).value = hh(teile[0][2]); }
+  if(teile[1]){ $('tag-von2-'+key).value = hh(teile[1][1]); $('tag-bis2-'+key).value = hh(teile[1][2]);
+    $('zeile-'+key).classList.add('mit-zweiter'); }
+}
 function applyToAllDays(){
   const von = $('f-std-von').value, bis = $('f-std-bis').value;
-  if(!von || !bis){ alert('Bitte zuerst Von und Bis für die Standardzeit eintragen.'); return; }
-  TAGE.forEach(t=>{
-    $('tag-ruhetag-'+t.key).checked = false;
-    $('tag-von-'+t.key).disabled = false; $('tag-bis-'+t.key).disabled = false;
-    $('tag-von-'+t.key).value = von; $('tag-bis-'+t.key).value = bis;
-  });
+  if(!von || !bis){ alert('Bitte zuerst Von und Bis eintragen.'); return; }
+  TAGE.forEach(t => setTag(t.key, von + '-' + bis));
+}
+function osmZeitenInsFormular(nachfragen){
+  if(!formOsmWoche || !Object.keys(formOsmWoche).length){ if(nachfragen) alert('Für diese Gaststätte kennt OpenStreetMap keine Öffnungszeiten.'); return; }
+  if(nachfragen && !confirm('Die Zeiten im Formular durch die von OpenStreetMap ersetzen?')) return;
+  TAGE.forEach(t => setTag(t.key, formOsmWoche[t.key] || ''));
+}
+function zeigeOsmZeitenHinweis(){
+  const h = $('osm-zeiten-hinweis');
+  const hat = formOsmWoche && Object.keys(formOsmWoche).length;
+  $('osm-uebernehmen-wrap').style.display = hat ? '' : 'none';
+  const auto = document.querySelector('input[name=zeitart]:checked').value === 'osm';
+  h.textContent = hat ? 'OpenStreetMap: ' + zeitenKurz(formOsmWoche)
+    + (auto ? ' – zum Anpassen „Selbst festlegen“ wählen, die Zeiten sind dort schon eingesetzt.' : '')
+    : (auto && (editIndex !== null || formOsmId) ? 'Bei OpenStreetMap sind keine Öffnungszeiten bekannt.' : '');
+}
+function zeigePosition(){
+  const manuell = document.querySelector('input[name=posart]:checked').value === 'manuell';
+  $('pos-osm').style.display = manuell ? 'none' : '';
+  $('pos-manuell').style.display = manuell ? '' : 'none';
+  $('osm-verknuepft').style.display = formOsmId ? '' : 'none';
+  $('osm-namensuche').style.display = formOsmId ? 'none' : '';
+  if(formOsmId){ $('osm-link').textContent = 'OpenStreetMap-Eintrag ' + formOsmId; $('osm-link').href = osmLink(formOsmId) || '#'; }
+}
+function loeseVerknuepfung(){
+  formOsmId = ''; zeigePosition();
+  if(!$('f-osmname').value) $('f-osmname').value = $('f-name').value;
+}
+function setZeitart(wert){
+  document.querySelector(`input[name=zeitart][value=${wert}]`).checked = true;
+  $('zeit-manuell').style.display = wert === 'manuell' ? '' : 'none';
+  zeigeOsmZeitenHinweis();
 }
 
-function zeitenZusammenfassung(zeiten){
-  if(!zeiten) return '';
-  return TAGE.map(t=>{
-    const w = zeiten[t.key];
-    if(!w) return null;
-    return t.kurz + ': ' + (String(w).toLowerCase()==='ruhetag' ? 'Ruhetag' : w);
-  }).filter(Boolean).join(' · ');
+function resetForm(){
+  ['f-name','f-osmname','f-lat','f-lon','f-hinweis','f-std-von','f-std-bis'].forEach(id => $(id).value = '');
+  TAGE.forEach(t => setTag(t.key, ''));
+  formOsmId = ''; formOsmWoche = null;
+  document.querySelector('input[name=posart][value=osm]').checked = true;
+  setZeitart('osm'); zeigePosition();
 }
 
-function renderList(){
-  const el = $('liste');
-  if(!entries.length){ el.innerHTML = '<div class="empty">Noch keine Gaststätte eingetragen.</div>'; return; }
-  el.innerHTML = '';
-  entries.forEach((e,i)=>{
-    const div = document.createElement('div'); div.className = 'list-item';
-    const left = document.createElement('div');
-    const b = document.createElement('b'); b.textContent = e.name; left.append(b);
-    const meta = document.createElement('div'); meta.className = 'meta';
-    const teile = [];
-    if(e.osm_name) teile.push('OSM: ' + e.osm_name);
-    if(e.punkt) teile.push('Koordinate: ' + e.punkt[0] + ', ' + e.punkt[1]);
-    const zeitZus = zeitenZusammenfassung(e.zeiten);
-    if(zeitZus) teile.push(zeitZus);
-    meta.textContent = teile.join(' · ') || 'Öffnungszeiten automatisch von OpenStreetMap';
-    left.append(meta);
-    const buttons = document.createElement('div'); buttons.className = 'item-buttons';
-    const editBtn = document.createElement('button'); editBtn.className = 'btn-edit'; editBtn.textContent = 'Bearbeiten';
-    editBtn.onclick = () => editEntry(i);
-    const btn = document.createElement('button'); btn.className = 'btn-danger'; btn.textContent = 'Entfernen';
-    btn.onclick = () => { entries.splice(i,1); renderList(); renderOutput(); };
-    buttons.append(editBtn, btn);
-    div.append(left, buttons);
-    el.append(div);
-  });
-}
+function formZuEintrag(){
+  const name = $('f-name').value.trim();
+  if(!name) throw 'Bitte einen Namen eintragen.';
+  const basis = editIndex !== null ? {...entries[editIndex]} : {};
+  BEKANNTE_FELDER.forEach(f => delete basis[f]);        // unbekannte Zusatzfelder bleiben erhalten
+  const e = {name};
 
-function yamlQuote(s){
-  return '"' + String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"') + '"';
-}
-
-function renderOutput(){
-  let out = HEADER;
-  if(!entries.length){
-    out += '\n  # Eure Einträge erscheinen hier, sobald du oben welche hinzufügst.\n';
+  if(document.querySelector('input[name=posart]:checked').value === 'osm'){
+    if(formOsmId) e.osm_id = formOsmId;
+    else{
+      const osmname = $('f-osmname').value.trim();
+      if(!osmname) throw 'Bitte den Namen bei OpenStreetMap eintragen oder die Koordinaten selbst angeben.';
+      e.osm_name = osmname;
+    }
+  }else{
+    const lat = parseFloat($('f-lat').value.replace(',','.')), lon = parseFloat($('f-lon').value.replace(',','.'));
+    if(isNaN(lat) || isNaN(lon)) throw 'Bitte gültige Breite und Länge eintragen.';
+    e.punkt = [lat, lon];
+    if(formOsmId) e.osm_id = formOsmId;                 // OSM-Zeiten bleiben trotz Handposition nutzbar
   }
-  entries.forEach(e=>{
+
+  if(document.querySelector('input[name=zeitart]:checked').value === 'manuell'){
+    const zeiten = {};
+    for(const t of TAGE){
+      if($('tag-ruhetag-'+t.key).checked){ zeiten[t.key] = 'Ruhetag'; continue; }
+      const teile = [];
+      for(const [a,b] of [['von','bis'],['von2','bis2']]){
+        const v = $(`tag-${a}-${t.key}`).value, bb = $(`tag-${b}-${t.key}`).value;
+        if(v && bb) teile.push(v + '-' + bb);
+        else if(v || bb) throw `${t.kurz}: bitte Von und Bis ausfüllen (oder beide leer lassen).`;
+      }
+      if(teile.length) zeiten[t.key] = teile.join(', ');
+    }
+    if(!Object.keys(zeiten).length) throw 'Bei „Selbst festlegen“ bitte mindestens einen Tag ausfüllen – oder „Automatisch“ wählen.';
+    e.zeiten = zeiten;
+  }
+  const hinweis = $('f-hinweis').value.trim();
+  if(hinweis) e.hinweis = hinweis;
+  return Object.assign(e, basis);
+}
+
+function formUebernehmen(){
+  let e;
+  try{ e = formZuEintrag(); }catch(msg){ alert(msg); return; }
+  const doppelt = entries.findIndex((x,i) => x.name === e.name && i !== editIndex);
+  if(doppelt >= 0){ alert(`„${e.name}“ steht schon in der Liste. Bitte einen anderen Namen wählen.`); return; }
+  if(editIndex !== null) entries[editIndex] = e; else entries.push(e);
+  editIndex = null; resetForm(); formModus(); aktualisiere();
+  $('save-info').scrollIntoView({block:'nearest'});
+}
+
+function editEntry(i){
+  if(editIndex !== i && !formVerwerfenOk()) return;
+  const e = entries[i];
+  editIndex = i; resetForm();
+  $('f-name').value = e.name || '';
+  formOsmId = e.osm_id || '';
+  if(e.punkt){
+    document.querySelector('input[name=posart][value=manuell]').checked = true;
+    $('f-lat').value = e.punkt[0]; $('f-lon').value = e.punkt[1];
+  }
+  $('f-osmname').value = e.osm_name || '';
+  zeigePosition();
+
+  const info = osmZuEintrag(e);
+  formOsmWoche = info && info.woche ? info.woche : null;
+  if(e.zeiten && Object.keys(e.zeiten).length){
+    TAGE.forEach(t => setTag(t.key, e.zeiten[t.key] || ''));
+    setZeitart('manuell');
+  }else{
+    osmZeitenInsFormular(false);      // vorbereitet, falls ihr auf „Selbst festlegen“ umschaltet
+    setZeitart('osm');
+  }
+  $('f-hinweis').value = e.hinweis || '';
+  formModus(); renderList();
+  $('form-card').scrollIntoView({behavior:'smooth', block:'start'});
+  $('f-name').focus({preventScroll:true});
+}
+
+function bearbeitenAbbrechen(){ editIndex = null; resetForm(); formModus(); renderList(); }
+function formModus(){
+  const bearbeiten = editIndex !== null;
+  $('form-titel').textContent = bearbeiten ? `„${entries[editIndex].name}“ bearbeiten` : 'Neue Gaststätte hinzufügen';
+  $('btn-form').textContent = bearbeiten ? 'Änderungen übernehmen' : 'Zur Liste hinzufügen';
+  $('btn-abbrechen').style.display = bearbeiten ? '' : 'none';
+  $('form-card').classList.toggle('editing', bearbeiten);
+}
+function formHatInhalt(){ return editIndex !== null || $('f-name').value.trim() !== ''; }
+function formVerwerfenOk(){
+  if(!formHatInhalt()) return true;
+  return confirm('Im Formular stehen noch nicht übernommene Angaben. Verwerfen?');
+}
+
+// ---------------------------------------------------------------- YAML erzeugen
+function yamlQuote(s){ return '"' + String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"') + '"'; }
+function renderYaml(liste){
+  let out = HEADER;
+  if(!liste.length) out += '  []\n';
+  liste.forEach(e=>{
     out += `  - name: ${yamlQuote(e.name)}\n`;
+    if(e.osm_id) out += `    osm_id: ${yamlQuote(e.osm_id)}\n`;
     if(e.osm_name) out += `    osm_name: ${yamlQuote(e.osm_name)}\n`;
     if(e.punkt) out += `    punkt: [${e.punkt[0]}, ${e.punkt[1]}]\n`;
     if(e.zeiten && Object.keys(e.zeiten).length){
       out += `    zeiten:\n`;
-      TAGE.forEach(t=>{
-        if(e.zeiten[t.key]) out += `      ${t.key}: ${yamlQuote(e.zeiten[t.key])}\n`;
-      });
+      TAGE.forEach(t => { if(e.zeiten[t.key]) out += `      ${t.key}: ${yamlQuote(e.zeiten[t.key])}\n`; });
     }
     if(e.hinweis) out += `    hinweis: ${yamlQuote(e.hinweis)}\n`;
+    Object.keys(e).filter(k => !BEKANNTE_FELDER.includes(k)).forEach(k=>{
+      out += jsyaml.dump({[k]: e[k]}, {lineWidth:-1}).split('\n').filter(Boolean).map(z => '    ' + z).join('\n') + '\n';
+    });
     out += '\n';
   });
-  $('output').value = out;
+  return out;
 }
 
-function resetForm(){
-  $('f-name').value=''; $('f-osmname').value=''; $('f-lat').value=''; $('f-lon').value='';
-  $('f-hinweis').value=''; $('f-std-von').value=''; $('f-std-bis').value='';
-  TAGE.forEach(t=>{
-    $('tag-ruhetag-'+t.key).checked=false;
-    $('tag-von-'+t.key).value=''; $('tag-von-'+t.key).disabled=false;
-    $('tag-bis-'+t.key).value=''; $('tag-bis-'+t.key).disabled=false;
-  });
-  document.querySelector('input[name=posart][value=osm]').checked = true;
-  document.querySelector('input[name=zeitart][value=osm]').checked = true;
-  $('pos-osm').style.display=''; $('pos-manuell').style.display='none';
-  $('zeit-manuell').style.display='none';
+// ---------------------------------------------------------------- Speichern
+function istGeaendert(){ return renderYaml(entries) !== gespeicherterText; }
+function aktualisiere(){
+  renderList(); renderOsmListe();
+  $('output').value = renderYaml(entries);
+  const dirty = istGeaendert();
+  $('btn-save').disabled = !dirty;
+  $('save-info').className = dirty ? 'dirty' : '';
+  $('save-info').textContent = dirty ? 'Ungespeicherte Änderungen' : 'Alles gespeichert.';
 }
 
-function addEntry(){
-  const name = $('f-name').value.trim();
-  if(!name){ alert('Bitte einen Namen eintragen.'); return; }
-
-  const posart = document.querySelector('input[name=posart]:checked').value;
-  const entry = {name};
-  if(posart === 'osm'){
-    const osmname = $('f-osmname').value.trim();
-    if(!osmname){ alert('Bitte den Namen bei OpenStreetMap eintragen, oder Koordinaten von Hand wählen.'); return; }
-    entry.osm_name = osmname;
-  }else{
-    const lat = parseFloat($('f-lat').value.replace(',','.'));
-    const lon = parseFloat($('f-lon').value.replace(',','.'));
-    if(isNaN(lat) || isNaN(lon)){ alert('Bitte gültige Breite und Länge eintragen.'); return; }
-    entry.punkt = [lat, lon];
+async function speichern(){
+  if(!token()){
+    $('token-details').open = true;
+    $('token-details').scrollIntoView({behavior:'smooth', block:'center'});
+    $('save-info').className = 'err'; $('save-info').textContent = 'Zuerst unten den Zugangsschlüssel eintragen.';
+    return;
   }
-
-  const zeitart = document.querySelector('input[name=zeitart]:checked').value;
-  if(zeitart === 'manuell'){
-    const zeiten = {};
-    TAGE.forEach(t=>{
-      if($('tag-ruhetag-'+t.key).checked){
-        zeiten[t.key] = 'Ruhetag';
-      }else{
-        const von = $('tag-von-'+t.key).value, bis = $('tag-bis-'+t.key).value;
-        if(von && bis) zeiten[t.key] = von + '-' + bis;
-      }
-    });
-    if(Object.keys(zeiten).length) entry.zeiten = zeiten;
+  if(formHatInhalt() && !confirm('Das Formular enthält noch nicht übernommene Angaben – die werden NICHT mitgespeichert. Trotzdem speichern?')) return;
+  const text = renderYaml(entries);
+  $('btn-save').disabled = true; $('save-info').className = ''; $('save-info').textContent = 'Speichere …';
+  try{
+    if(!sha){ const d = await ladeDatei(); sha = d.sha; }
+    const body = {message: 'Gaststätten über erfassen.html aktualisiert', content: textZuB64(text), branch: BRANCH};
+    if(sha) body.sha = sha;
+    const res = await fetch(API, {method:'PUT', headers:{...apiHeaders(), 'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    if(!res.ok){
+      if(res.status === 409 || res.status === 422)
+        throw 'Die Datei wurde zwischenzeitlich anderswo geändert. Bitte Seite neu laden und die Änderung erneut vornehmen.';
+      if(res.status === 401) throw 'Der Zugangsschlüssel ist ungültig oder abgelaufen. Bitte unten neu eintragen.';
+      if(res.status === 403 || res.status === 404) throw 'Der Zugangsschlüssel darf nicht in dieses Repository schreiben (Contents: Read and write?).';
+      throw 'Speichern fehlgeschlagen (HTTP ' + res.status + ').';
+    }
+    const js = await res.json();
+    sha = js.content.sha; gespeicherterText = text;
+    aktualisiere();
+    $('save-info').className = 'ok';
+    $('save-info').textContent = 'Gespeichert. Die Karte ist in wenigen Minuten aktuell.';
+  }catch(msg){
+    $('save-info').className = 'err'; $('save-info').textContent = typeof msg === 'string' ? msg : 'Keine Verbindung zu GitHub.';
+    $('btn-save').disabled = !istGeaendert();
   }
-
-  const hinweis = $('f-hinweis').value.trim();
-  if(hinweis) entry.hinweis = hinweis;
-
-  entries.push(entry);
-  renderList(); renderOutput();
-  resetForm();
-  $('f-name').focus();
 }
 
-function zeitTeile(wert){
-  const m = String(wert).match(/^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})$/);
-  return m ? {von:m[1], bis:m[2]} : {von:'', bis:''};
+async function tokenSpeichern(){
+  const t = $('f-token').value.trim();
+  if(!t){ $('token-status').textContent = 'Bitte den Schlüssel einfügen.'; return; }
+  $('token-status').style.color = ''; $('token-status').textContent = 'Prüfe …';
+  try{
+    const res = await fetch(`https://api.github.com/repos/${REPO}`, {headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer ' + t}});
+    if(res.status === 401) throw 'Schlüssel ungültig oder abgelaufen.';
+    if(!res.ok) throw 'Kein Zugriff auf ' + REPO + ' (HTTP ' + res.status + ').';
+    const js = await res.json();
+    if(js.permissions && js.permissions.push === false) throw 'Der Schlüssel darf nur lesen. Bitte „Contents: Read and write“ wählen.';
+    localStorage.setItem(TOKEN_KEY, t);
+    $('f-token').value = '';
+    tokenAnzeige();
+    $('token-status').style.color = 'var(--ok)'; $('token-status').textContent = 'Eingerichtet. Auf diesem Gerät kann jetzt gespeichert werden.';
+    if(istGeaendert()){ $('save-info').className = 'dirty'; $('save-info').textContent = 'Ungespeicherte Änderungen'; }
+  }catch(msg){
+    $('token-status').style.color = 'var(--err)'; $('token-status').textContent = typeof msg === 'string' ? msg : 'Keine Verbindung zu GitHub.';
+  }
 }
-
-function editEntry(i){
-  const e = entries[i];
-  entries.splice(i,1);          // aus der Liste nehmen, wird beim "Hinzufügen" unten wieder ergänzt
-  renderList(); renderOutput();
-
-  resetForm();
-  $('f-name').value = e.name || '';
-
-  if(e.punkt){
-    document.querySelector('input[name=posart][value=manuell]').checked = true;
-    $('pos-osm').style.display='none'; $('pos-manuell').style.display='';
-    $('f-lat').value = e.punkt[0]; $('f-lon').value = e.punkt[1];
-  }else if(e.osm_name){
-    $('f-osmname').value = e.osm_name;   // posart osm ist schon durch resetForm() vorausgewaehlt
-  }
-
-  if(e.zeiten && Object.keys(e.zeiten).length){
-    document.querySelector('input[name=zeitart][value=manuell]').checked = true;
-    $('zeit-manuell').style.display='';
-    TAGE.forEach(t=>{
-      const wert = e.zeiten[t.key];
-      if(!wert) return;
-      if(String(wert).toLowerCase()==='ruhetag'){
-        $('tag-ruhetag-'+t.key).checked = true;
-        $('tag-von-'+t.key).disabled = true; $('tag-bis-'+t.key).disabled = true;
-      }else{
-        const {von,bis} = zeitTeile(wert);
-        $('tag-von-'+t.key).value = von; $('tag-bis-'+t.key).value = bis;
-      }
-    });
-  }
-
-  $('f-hinweis').value = e.hinweis || '';
-
-  $('f-name').scrollIntoView({behavior:'smooth', block:'center'});
-  $('f-name').focus();
+function tokenEntfernen(){
+  try{ localStorage.removeItem(TOKEN_KEY); }catch(_){}
+  tokenAnzeige(); $('token-status').style.color = ''; $('token-status').textContent = 'Von diesem Gerät entfernt.';
+}
+function tokenAnzeige(){
+  $('token-summary').textContent = token() ? 'Speichern ist auf diesem Gerät eingerichtet' : 'Zugangsschlüssel eintragen';
 }
 
 function copyOutput(){
   const ta = $('output'); ta.select();
   navigator.clipboard.writeText(ta.value).then(()=>{
-    const m = $('copied-msg'); m.style.display=''; setTimeout(()=>m.style.display='none', 2000);
-  }).catch(()=>{ document.execCommand('copy'); });
+    const m = $('copied-msg'); m.style.display = ''; setTimeout(()=> m.style.display = 'none', 2000);
+  }).catch(()=> document.execCommand('copy'));
 }
 
-document.querySelectorAll('input[name=posart]').forEach(r=>r.addEventListener('change', e=>{
-  $('pos-osm').style.display = e.target.value === 'osm' ? '' : 'none';
-  $('pos-manuell').style.display = e.target.value === 'manuell' ? '' : 'none';
-}));
-document.querySelectorAll('input[name=zeitart]').forEach(r=>r.addEventListener('change', e=>{
-  $('zeit-manuell').style.display = e.target.value === 'manuell' ? '' : 'none';
-}));
-
-buildTageZeilen();
-load();
+// ---------------------------------------------------------------- Start
+document.querySelectorAll('input[name=posart]').forEach(r => r.addEventListener('change', zeigePosition));
+document.querySelectorAll('input[name=zeitart]').forEach(r => r.addEventListener('change', e => setZeitart(e.target.value)));
+window.addEventListener('beforeunload', e => { if(istGeaendert()){ e.preventDefault(); e.returnValue = ''; } });
+$('repo-name-hilfe').textContent = REPO;
+buildTageZeilen(); resetForm(); tokenAnzeige();
+load().then(ladeOsmDaten);
 </script>
 </body>
-
 </html>
