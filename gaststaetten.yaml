@@ -14,28 +14,42 @@
 #     Actions), der Rest der Karte funktioniert trotzdem weiter.
 
 gaststaetten:
-  - name: "Gasthaus Froschkönig"
-    osm_name: "Gasthaus Froschkönig"
-
-  - name: "Spreewaldhof Leipe"
-    osm_name: "Schön Hier"
-
-  - name: "Dubkow Mühle"
-    osm_name: "Dubkow Mühle"
-
-  - name: "Waldhotel Eiche"
-    osm_name: "Waldhotel Eiche"
+  - name: "Gasthaus zum Froschkönig"
+    osm_name: "Froschkönig"
+    hinweis: "Leipe. Genaue Öffnungszeiten bitte direkt erfragen (Tel. 03542 403940) und hier ergänzen."
 
   - name: "Gasthaus Wotschofska"
     osm_name: "Wotschofska"
+    hinweis: "Nur per Kahn, Rad oder zu Fuß erreichbar. Saisonal (ca. April–Oktober), genaue Tageszeiten bitte vor Ort prüfen."
 
-  - name: "Die Stallwirtschaft im Oppott"
-    osm_name: "Die Stallwirtschaft im Oppott"
+  - name: "Gasthaus Dubkowmühle"
+    osm_name: "Dubkowmühle"
+    hinweis: "Leipe. Saisonpause November–März. In der Saison laut Anbieter täglich 11:30–22:00 Uhr, bitte prüfen."
 
-  - name: "Cafe Venedig"
-    osm_name: "Cafe Venedig"
+  - name: "Gasthaus Eiche (Waldhotel Eiche)"
+    osm_name: "Waldhotel Eiche"
+    hinweis: "Das historische Gasthaus Eiche existiert nicht mehr; heute das Waldhotel Eiche in Burg-Kauper. Bitte bestätigen, ob das gemeint ist."
 
-  - name: "Kaupen No. 6"
-    osm_name: "Kaupen No. 6"
+  - name: "Oppott - die Stallwirtschaft"
+    osm_name: "Oppott"
+    zeiten:
+      montag: "Ruhetag"
+      dienstag: "11:00-17:00"
+      mittwoch: "11:00-17:00"
+      donnerstag: "11:00-17:00"
+      freitag: "11:00-17:00"
+      samstag: "11:00-17:00"
+      sonntag: "Ruhetag"
+    hinweis: "Lehde, nur per Kahn oder zu Fuß erreichbar. Saisonal geöffnet (ca. Ostern bis Oktober), außerhalb der Saison geschlossen."
 
-
+  - name: "Gasthaus Kaupen Nr. 6"
+    osm_name: "Kaupen"
+    zeiten:
+      montag: "Ruhetag"
+      dienstag: "Ruhetag"
+      mittwoch: "Ruhetag"
+      donnerstag: "12:00-21:00"
+      freitag: "12:00-21:00"
+      samstag: "12:00-21:00"
+      sonntag: "12:00-21:00"
+    hinweis: "Lehde, nur per Kahn oder Fußweg erreichbar. Saisonal geöffnet (ca. ab Mitte April), außerhalb der Saison geschlossen."
