@@ -122,6 +122,8 @@ regeln:
     ways_regex: "^(I|Erster|1)[^A-Za-z]*Freiheitskanal"
 
   - match: "dresslerstrom"
+    manual:
+      - line: [[52.03828, 13.863775], [52.038616, 13.863389], [52.038795, 13.863078], [52.039019, 13.863013], [52.039283, 13.862638]]
     ways: ["Dresslerstrom"]
 
   - match: "lehder graben"
