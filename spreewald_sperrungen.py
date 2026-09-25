@@ -160,12 +160,14 @@ class Geo:
         self.offline = offline
         self.fehler_folge = 0
         self.aus_speicher = 0
+        self.letzter_status = ""      # frisch | alt | leer | fehler  (für erfassen.html)
 
     def _speichern(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(self.cache, ensure_ascii=False), encoding="utf-8")
 
     def _alt(self, ql, grund):
+        self.letzter_status = "alt" if ql in self.cache else ("leer" if grund == "keine Treffer mehr" else "fehler")
         if ql in self.cache:
             self.aus_speicher += 1
             print(f"  ~ {grund} -> letzter bekannter Stand verwendet: {ql[:80]}", file=sys.stderr)
@@ -177,6 +179,7 @@ class Geo:
         """max_age_h: so lange gilt ein gespeichertes Ergebnis als aktuell (Gewässer 30 Tage,
         Gaststätten/Öffnungszeiten 20 Stunden). Ältere Ergebnisse dienen nur noch als Rückfall."""
         eintrag = self.cache.get(ql)
+        self.letzter_status = "frisch"
         if eintrag and time.time() - eintrag["t"] < max_age_h * 3600:
             return eintrag["e"]
         if self.offline:
@@ -204,6 +207,7 @@ class Geo:
             if eintrag:                                     # früher gefunden, jetzt nicht: lieber alten Stand
                 return self._alt(ql, "keine Treffer mehr")
             print(f"  ? keine Treffer: {ql[:90]}", file=sys.stderr)
+            self.letzter_status = "leer"
             return []
         self.fehler_folge += 1
         if self.fehler_folge >= self.MAX_FEHLER:
@@ -247,7 +251,8 @@ class Geo:
         """Sucht eine Gaststätte nach Namen (Groß-/Kleinschreibung egal), liefert Position + OSM-Tags.
         Auch Hotels/Pensionen werden gefunden (viele Gasthöfe sind bei OSM so eingetragen); ein Eintrag
         als Restaurant/Café hat aber Vorrang."""
-        pat = str(name_pattern).replace("\\", "\\\\").replace('"', '\\"')
+        teile = [re.sub(r"[^\w.]", ".", t) for t in re.split(r"[\s\-]+", str(name_pattern).strip()) if t]
+        pat = "[ -]?".join(teile)
         ql = (f'[out:json][timeout:60];('
               f'nwr["name"~"{pat}",i]["amenity"~"^(restaurant|cafe|bar|pub|fast_food|biergarten)$"]({BBOX});'
               f'nwr["name"~"{pat}",i]["tourism"~"^(hotel|guest_house|chalet|hostel)$"]({BBOX});'
@@ -643,7 +648,8 @@ def load_restaurants(path, day, geo, osm_info=None):
             if osm_info is not None:                          # für erfassen.html: was OSM zu diesem Eintrag weiß
                 oh = osm_tags.get("opening_hours", "")
                 woche, unsicher_w = osm_week_as_zeiten(oh)
-                osm_info[name] = {"gefunden": bool(treffer), "osm": treffer["osm"] if treffer else "",
+                osm_info[name] = {"gefunden": bool(treffer), "abfrage": geo.letzter_status,
+                                  "osm": treffer["osm"] if treffer else "",
                                   "osm_name": osm_tags.get("name", ""), "opening_hours": oh,
                                   "woche": woche, "unsicher": unsicher_w}
             if not punkt:
@@ -681,7 +687,8 @@ def write_restaurant_osm_data(osm_info, geo, out):
     und aller Gaststätten der Umgebung, die bei OSM Öffnungszeiten haben. Die Karte selbst nutzt das nicht."""
     try:
         umgebung = []
-        for p in geo.pois_umgebung():
+        treffer_umgebung = geo.pois_umgebung()
+        for p in treffer_umgebung:
             t = p["tags"]
             woche, unsicher = osm_week_as_zeiten(t.get("opening_hours", ""))
             ort = t.get("addr:city") or t.get("addr:place") or t.get("addr:suburb") or ""
@@ -689,7 +696,8 @@ def write_restaurant_osm_data(osm_info, geo, out):
                              "art": t.get("amenity", ""), "lat": round(p["lat"], 6), "lon": round(p["lon"], 6),
                              "opening_hours": t.get("opening_hours", ""), "woche": woche, "unsicher": unsicher})
         umgebung.sort(key=lambda x: x["name"].lower())
-        data = {"erzeugt": berlin_now().strftime("%d.%m.%Y %H:%M"), "eintraege": osm_info, "umgebung": umgebung}
+        data = {"erzeugt": berlin_now().strftime("%d.%m.%Y %H:%M"), "eintraege": osm_info, "umgebung": umgebung,
+                "umgebung_status": geo.letzter_status}
         out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"OSM-Daten für erfassen.html: {len(osm_info)} eingetragene, {len(umgebung)} in der Umgebung")
     except Exception as ex:
