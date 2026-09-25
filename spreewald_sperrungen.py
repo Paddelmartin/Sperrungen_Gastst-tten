@@ -379,14 +379,27 @@ def compare(old_rows, new_rows):
     return added, changed, removed
 
 
-def position_hint(t, rules):
+PRUEFEN = "-> bitte auf gewaesser.html prüfen"
+
+
+def position_hint(t, rules, old=None):
+    """Kurzer Kartenhinweis für die Push-Nachricht. Bei von Hand gezeichneten Positionen wird zur Prüfung
+    aufgefordert, weil eine geänderte LBV-Meldung an anderer Stelle liegen oder anders formuliert sein kann."""
     row = dict(zip(KEYS, t))
     if row["gewaesser"].lower().startswith("oberspreewald"):
         return "Gebietshinweis (keine Kartenposition nötig)"
     rule = find_rule(rules, row)
-    if rule and (rule.get("manual") or rule.get("ways") or rule.get("near")):
-        return "Position hinterlegt"
-    return "ACHTUNG: KEINE Position hinterlegt -> bitte in gewaesser.yaml ergänzen"
+    if old is not None:
+        alt = find_rule(rules, dict(zip(KEYS, old)))
+        if alt is not None and alt is not rule and alt.get("manual"):
+            return f"ACHTUNG: passt nicht mehr zu eurer Handzeichnung (Wortlaut geändert) {PRUEFEN}"
+    if not rule or not (rule.get("manual") or rule.get("ways") or rule.get("ways_regex") or rule.get("near")):
+        return "ACHTUNG: KEINE Position hinterlegt -> auf gewaesser.html einzeichnen"
+    if rule.get("manual"):
+        if not rule.get("bereich"):
+            return f"von Hand eingezeichnet, Regel OHNE Bereich-Stichwort (gilt fürs ganze Gewässer) {PRUEFEN}"
+        return f"von Hand eingezeichnet (Bereich „{rule['bereich']}“) {PRUEFEN}"
+    return "Position hinterlegt (automatisch aus OpenStreetMap)"
 
 
 def build_message(added, changed, removed, stand, rules):
@@ -415,12 +428,14 @@ def build_message(added, changed, removed, stand, rules):
             for i, k in enumerate(KEYS):
                 if k in LABELS and old[i] != new[i]:
                     L += [f"  {LABELS[k]} vorher:  {old[i]}", f"  {LABELS[k]} jetzt:   {new[i]}"]
-            L.append("")
+            L += [f"  Karte:    {position_hint(new, rules, old)}", ""]
     if removed:
         L += [f"ENTFERNT / nicht mehr aufgeführt ({len(removed)})", ""]
         for t in removed:
             r = dict(zip(KEYS, t))
             L += [f"* {r['gewaesser']}", f"  Bereich:  {r['bereich']}", f"  Zeitraum: {r['zeitraum']}", ""]
+    if any(PRUEFEN in z or "KEINE Position" in z for z in L):
+        subject += " – Karte prüfen"
     map_url = os.environ.get("MAP_URL")
     if map_url:
         L.append(f"Karte:      {map_url}")
