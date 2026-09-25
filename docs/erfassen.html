@@ -362,11 +362,14 @@ function renderList(){
 
     const info = osmZuEintrag(e);
     const osmWoche = info && Object.keys(info.woche||{}).length ? zeitenKurz(info.woche) : '';
+    if(info && !info.gefunden && !e.punkt){
+      left.append(el('div','warnzeile','Fehlt auf der Karte: bei OpenStreetMap nicht gefunden. Bitte „Bearbeiten“ → „Koordinaten selbst eintragen“.'));
+    }
     if(e.zeiten && Object.keys(e.zeiten).length){
       left.append(el('div','meta','Eigene Zeiten: ' + zeitenKurz(e.zeiten)));
       if(osmWoche) left.append(el('div','osm','OpenStreetMap sagt: ' + osmWoche));
     }else if(info && !info.gefunden && !e.punkt){
-      left.append(el('div','warnzeile','Beim letzten Lauf bei OpenStreetMap nicht gefunden – erscheint nicht auf der Karte.'));
+      // Warnung steht schon oben
     }else if(osmWoche){
       left.append(el('div','osm','Zeiten von OpenStreetMap: ' + osmWoche + (info.unsicher ? ' (teilweise unklar)' : '')));
     }else if(info){
