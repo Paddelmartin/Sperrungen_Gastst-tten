@@ -141,18 +141,48 @@ def hav(lat1, lon1, lat2, lon2):
 
 
 class Geo:
-    """Overpass-Abfragen mit Datei-Cache (geo_cache.json) -> täglicher Lauf bleibt schnell."""
+    """Overpass-Abfragen mit dauerhaftem Zwischenspeicher (state/geo_cache.json, wird mit ins Repository
+    gesichert). Sind die OSM-Server überlastet, wird der zuletzt erfolgreiche Stand verwendet - so
+    verschwinden Kanäle und Gaststätten nicht mehr von der Karte, nur weil OSM gerade nicht antwortet."""
+
+    MAX_FEHLER = 2          # so viele Abfragen hintereinander ohne jeden erreichbaren Server -> Rest aus Speicher
 
     def __init__(self, offline):
-        self.path = HERE / "geo_cache.json"
-        self.cache = json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {}
+        self.path = HERE / "state" / "geo_cache.json"
+        self.cache = {}
+        for pfad in (HERE / "geo_cache.json", self.path):          # alter Speicherort wird übernommen
+            if pfad.exists():
+                try:
+                    for ql, wert in json.loads(pfad.read_text(encoding="utf-8")).items():
+                        self.cache[ql] = wert if isinstance(wert, dict) else {"t": 0, "e": wert}
+                except Exception as ex:
+                    print(f"  ! Zwischenspeicher {pfad.name} unlesbar ({ex})", file=sys.stderr)
         self.offline = offline
+        self.fehler_folge = 0
+        self.aus_speicher = 0
 
-    def query(self, ql):
+    def _speichern(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(self.cache, ensure_ascii=False), encoding="utf-8")
+
+    def _alt(self, ql, grund):
         if ql in self.cache:
-            return self.cache[ql]
+            self.aus_speicher += 1
+            print(f"  ~ {grund} -> letzter bekannter Stand verwendet: {ql[:80]}", file=sys.stderr)
+            return self.cache[ql]["e"]
+        print(f"  ? {grund}, auch nichts im Speicher: {ql[:80]}", file=sys.stderr)
+        return []
+
+    def query(self, ql, max_age_h=24 * 30):
+        """max_age_h: so lange gilt ein gespeichertes Ergebnis als aktuell (Gewässer 30 Tage,
+        Gaststätten/Öffnungszeiten 20 Stunden). Ältere Ergebnisse dienen nur noch als Rückfall."""
+        eintrag = self.cache.get(ql)
+        if eintrag and time.time() - eintrag["t"] < max_age_h * 3600:
+            return eintrag["e"]
         if self.offline:
-            return []
+            return eintrag["e"] if eintrag else []
+        if self.fehler_folge >= self.MAX_FEHLER:
+            return self._alt(ql, "OSM-Server nicht erreichbar")
         for url in OVERPASS_URLS:
             host = url.split("/")[2]
             try:
@@ -160,17 +190,25 @@ class Geo:
             except Exception as e:                          # nächsten Server probieren
                 print(f"  ! {host}: {e}", file=sys.stderr)
                 continue
+            self.fehler_folge = 0
             if js.get("remark"):
                 print(f"  ! Overpass-Hinweis: {js['remark']}", file=sys.stderr)
             elements = js.get("elements", [])
-            if elements:                                    # leere Antworten NICHT dauerhaft merken
-                self.cache[ql] = elements
-                self.path.write_text(json.dumps(self.cache), encoding="utf-8")
-            else:
-                print(f"  ? keine Treffer: {ql[:90]}", file=sys.stderr)
             time.sleep(4)                                   # Server nicht überlasten
-            return elements
-        return []
+            if elements:
+                self.cache[ql] = {"t": time.time(), "e": elements}
+                self._speichern()
+                return elements
+            if js.get("remark"):                            # abgebrochene Abfrage ist kein echtes "nichts"
+                return self._alt(ql, "Abfrage abgebrochen")
+            if eintrag:                                     # früher gefunden, jetzt nicht: lieber alten Stand
+                return self._alt(ql, "keine Treffer mehr")
+            print(f"  ? keine Treffer: {ql[:90]}", file=sys.stderr)
+            return []
+        self.fehler_folge += 1
+        if self.fehler_folge >= self.MAX_FEHLER:
+            print("  ! OSM-Server überlastet - restliche Abfragen dieses Laufs aus dem Speicher", file=sys.stderr)
+        return self._alt(ql, "kein OSM-Server erreichbar")
 
     @staticmethod
     def _post(url, ql):
@@ -185,6 +223,14 @@ class Geo:
 
     def ways(self, names):
         ql = f'[out:json][timeout:60];way["waterway"]["name"~"^({"|".join(names)})$"]({BBOX});out geom;'
+        return [[[p["lat"], p["lon"]] for p in el["geometry"]]
+                for el in self.query(ql) if el.get("geometry")]
+
+    def ways_regex(self, pattern):
+        """Wie ways(), aber mit freiem Suchmuster ohne Groß-/Kleinschreibung - verträgt Schreibvarianten
+        wie 'III. Freiheitskanal', 'III Freiheitskanal', 'Dritter Freiheitskanal'."""
+        pat = str(pattern).replace('"', '\\"')
+        ql = f'[out:json][timeout:60];way["waterway"]["name"~"{pat}",i]({BBOX});out geom;'
         return [[[p["lat"], p["lon"]] for p in el["geometry"]]
                 for el in self.query(ql) if el.get("geometry")]
 
@@ -207,7 +253,7 @@ class Geo:
               f'nwr["name"~"{pat}",i]["tourism"~"^(hotel|guest_house|chalet|hostel)$"]({BBOX});'
               f');out center tags;')
         treffer = []
-        for el in self.query(ql):
+        for el in self.query(ql, max_age_h=20):
             c = el if "lat" in el else el.get("center")
             if c:
                 treffer.append({"lat": c["lat"], "lon": c["lon"], "tags": el.get("tags", {}),
@@ -221,7 +267,7 @@ class Geo:
         m = re.match(r"^(node|way|relation)/(\d+)$", str(osm_id).strip())
         if not m:
             raise ValueError(f"osm_id '{osm_id}' hat nicht die Form node/123, way/123 oder relation/123")
-        for el in self.query(f'[out:json][timeout:60];{m.group(1)}({m.group(2)});out center tags;'):
+        for el in self.query(f'[out:json][timeout:60];{m.group(1)}({m.group(2)});out center tags;', max_age_h=20):
             c = el if "lat" in el else el.get("center")
             if c:
                 return {"lat": c["lat"], "lon": c["lon"], "tags": el.get("tags", {}),
@@ -235,7 +281,7 @@ class Geo:
               'nwr["amenity"~"^(restaurant|cafe|bar|pub|fast_food|biergarten)$"]["name"]["opening_hours"]'
               f'({BBOX});out center tags;')
         out = []
-        for el in self.query(ql):
+        for el in self.query(ql, max_age_h=20):
             c = el if "lat" in el else el.get("center")
             if c:
                 out.append({"lat": c["lat"], "lon": c["lon"], "tags": el.get("tags", {}),
@@ -267,14 +313,16 @@ def build_geometry(rule, geo):
         return out
     radius = rule.get("radius_m", 300)
     anchors = geo.anchors(rule["near"]) if rule.get("near") else []
-    if rule.get("ways") and rule.get("near") and not anchors:
+    if (rule.get("ways") or rule.get("ways_regex")) and rule.get("near") and not anchors:
         return []            # Abschnitt nicht bestimmbar -> lieber "nicht verortet" als die ganze Linie
     lines = geo.ways(rule["ways"]) if rule.get("ways") else []
+    if not lines and rule.get("ways_regex"):              # Rückfall: tolerante Suche nach Schreibvarianten
+        lines = geo.ways_regex(rule["ways_regex"])
     if lines and anchors:
         lines = [seg for l in lines for seg in clip(l, anchors, radius)]
     if lines:
         return [{"t": "line", "c": l} for l in lines]
-    if anchors and not rule.get("ways"):
+    if anchors and not (rule.get("ways") or rule.get("ways_regex")):
         return [{"t": "circle", "c": a, "r": radius} for a in anchors]
     return []
 
@@ -676,6 +724,7 @@ def main():
         row["status"] = st
         row["geom"], row["genau"] = [], True
         rule = find_rule(rules, row)
+        row["regel"] = next((n for n, r in enumerate(rules) if r is rule), None)   # für gewaesser.html
         if rule and st != "gebiet":
             row["geom"] = build_geometry(rule, geo)
             row["genau"] = rule.get("genau", True)
