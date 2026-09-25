@@ -33,7 +33,14 @@ gaststaetten:
 
   - name: "Gasthaus Wotschofska"
     osm_name: "Wotschofska"
-    hinweis: "Nur per Kahn, Rad oder zu Fuß erreichbar. Saisonal (ca. April–Oktober), genaue Tageszeiten bitte vor Ort prüfen."
+    zeiten:
+      montag: "11:00-17:00"
+      dienstag: "11:00-17:00"
+      mittwoch: "11:00-17:00"
+      donnerstag: "11:00-17:00"
+      freitag: "11:00-17:00"
+      samstag: "11:00-17:00"
+      sonntag: "11:00-17:00"
 
   - name: "Gasthaus Dubkowmühle"
     osm_name: "Dubkowmühle"
