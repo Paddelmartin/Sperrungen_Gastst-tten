@@ -87,3 +87,6 @@ gaststaetten:
       samstag: "12:00-21:00"
       sonntag: "12:00-21:00"
 
+  - name: "Cafe Venedig"
+    osm_id: "node/1396123621"
+
