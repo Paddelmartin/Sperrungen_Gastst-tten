@@ -7,6 +7,8 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <style>
   :root{ --brand-orange:#EC6D28; --brand-orange-dark:#D25A1B; --brand-blue:#0F63A6; --brand-blue-dark:#0B4C80;
     --bg:#F5F7FA; --card:#fff; --line:#E1E6EC; --ok:#2e7d32; --err:#b00020; }
@@ -78,6 +80,9 @@
     background:#20262c;color:#e9edf1;border:none;border-radius:8px;padding:12px}
   #token-status{font-size:12.5px;margin-top:8px}
   a{color:var(--brand-orange-dark)}
+  #g-karte{height:320px;border-radius:8px;border:1px solid var(--line);margin-top:8px}
+  #g-karte-hinweis{font-size:12.5px;color:var(--brand-blue-dark);margin-top:8px}
+  .savebar{z-index:1000}
   code{font-size:12px}
 </style>
 </head>
@@ -123,11 +128,14 @@
       </div>
     </div>
     <div id="pos-manuell" style="display:none">
+      <div id="g-karte-hinweis">Auf der Karte auf das Gasthaus tippen. Mit + hineinzoomen für die genaue Stelle.</div>
+      <div id="g-karte"></div>
+      <div class="hint">Graue Punkte: die anderen Gaststätten auf eurer Karte.</div>
       <div class="row2" style="margin-top:6px">
         <div><input type="text" id="f-lat" placeholder="Breite, z. B. 51.86500"></div>
         <div><input type="text" id="f-lon" placeholder="Länge, z. B. 13.97500"></div>
       </div>
-      <div class="hint">Rechtsklick auf die Stelle in openstreetmap.org, „Adresse hier anzeigen“.</div>
+      <div class="hint">Wird durch Tippen auf die Karte ausgefüllt; ihr könnt die Zahlen auch selbst eintragen.</div>
     </div>
 
     <label>Öffnungszeiten</label>
@@ -437,7 +445,7 @@ function osmUebernehmen(p){
   if(!formVerwerfenOk()) return;
   resetForm();
   $('f-name').value = p.name;
-  formOsmId = p.osm; formOsmWoche = p.woche || null;
+  formOsmId = p.osm; formOsmWoche = p.woche || null; formOsmPunkt = [p.lat, p.lon];
   zeigePosition();
   osmZeitenInsFormular(false);          // Zeiten schon eintragen, falls ihr gleich anpassen wollt
   zeigeOsmZeitenHinweis();
@@ -502,6 +510,7 @@ function zeigePosition(){
   const manuell = document.querySelector('input[name=posart]:checked').value === 'manuell';
   $('pos-osm').style.display = manuell ? 'none' : '';
   $('pos-manuell').style.display = manuell ? '' : 'none';
+  if(manuell) karteVorbereiten();
   $('osm-verknuepft').style.display = formOsmId ? '' : 'none';
   $('osm-namensuche').style.display = formOsmId ? 'none' : '';
   if(formOsmId){ $('osm-link').textContent = 'OpenStreetMap-Eintrag ' + formOsmId; $('osm-link').href = osmLink(formOsmId) || '#'; }
@@ -519,7 +528,8 @@ function setZeitart(wert){
 function resetForm(){
   ['f-name','f-osmname','f-lat','f-lon','f-hinweis','f-std-von','f-std-bis'].forEach(id => $(id).value = '');
   TAGE.forEach(t => setTag(t.key, ''));
-  formOsmId = ''; formOsmWoche = null;
+  formOsmId = ''; formOsmWoche = null; formOsmPunkt = null;
+  if(gMarker){ gKarte.removeLayer(gMarker); gMarker = null; }
   document.querySelector('input[name=posart][value=osm]').checked = true;
   setZeitart('osm'); zeigePosition();
 }
@@ -543,6 +553,7 @@ function formZuEintrag(){
     if(isNaN(lat) || isNaN(lon)) throw 'Bitte gültige Breite und Länge eintragen.';
     e.punkt = [lat, lon];
     if(formOsmId) e.osm_id = formOsmId;                 // OSM-Zeiten bleiben trotz Handposition nutzbar
+    else if($('f-osmname').value.trim()) e.osm_name = $('f-osmname').value.trim();
   }
 
   if(document.querySelector('input[name=zeitart]:checked').value === 'manuell'){
@@ -581,6 +592,7 @@ function editEntry(i){
   editIndex = i; resetForm();
   $('f-name').value = e.name || '';
   formOsmId = e.osm_id || '';
+  const infoPos = osmZuEintrag(e); formOsmPunkt = infoPos && infoPos.punkt ? infoPos.punkt : null;
   if(e.punkt){
     document.querySelector('input[name=posart][value=manuell]').checked = true;
     $('f-lat').value = e.punkt[0]; $('f-lon').value = e.punkt[1];
@@ -615,6 +627,57 @@ function formHatInhalt(){ return editIndex !== null || $('f-name').value.trim() 
 function formVerwerfenOk(){
   if(!formHatInhalt()) return true;
   return confirm('Im Formular stehen noch nicht übernommene Angaben. Verwerfen?');
+}
+
+// ---------------------------------------------------------------- Karte für die Position
+let gKarte = null, gMarker = null, gKontext = null;
+let formOsmPunkt = null;       // von OpenStreetMap gefundene Position des Eintrags (Startvorschlag)
+const r6 = x => Math.round(x * 1e6) / 1e6;
+
+function karteAnlegen(){
+  gKarte = L.map('g-karte').setView([51.86, 13.99], 11);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {maxZoom: 19, attribution: '© OpenStreetMap-Mitwirkende'}).addTo(gKarte);
+  gKontext = L.layerGroup().addTo(gKarte);
+  gKarte.on('click', e => setzePunkt(r6(e.latlng.lat), r6(e.latlng.lng), false));
+  ['f-lat','f-lon'].forEach(id => $(id).addEventListener('input', ()=>{
+    const lat = parseFloat($('f-lat').value.replace(',','.')), lon = parseFloat($('f-lon').value.replace(',','.'));
+    if(!isNaN(lat) && !isNaN(lon)) setzePunkt(lat, lon, true, true);
+  }));
+}
+function setzePunkt(lat, lon, zentrieren, ausFeld){
+  if(!ausFeld){ $('f-lat').value = lat; $('f-lon').value = lon; }
+  if(gMarker) gMarker.setLatLng([lat, lon]);
+  else gMarker = L.marker([lat, lon], {draggable: true}).addTo(gKarte)
+    .on('dragend', e => { const p = e.target.getLatLng(); setzePunkt(r6(p.lat), r6(p.lng), false); });
+  if(zentrieren) gKarte.setView([lat, lon], Math.max(gKarte.getZoom(), 16));
+}
+function positionVon(e){
+  if(e.punkt) return e.punkt;
+  const info = osmZuEintrag(e);
+  return info && info.punkt ? info.punkt : null;
+}
+function karteVorbereiten(){
+  if(!gKarte) karteAnlegen();
+  setTimeout(()=>{
+    gKarte.invalidateSize();
+    gKontext.clearLayers();
+    entries.forEach((e,i)=>{
+      if(i === editIndex) return;
+      const p = positionVon(e);
+      if(p) L.circleMarker(p, {radius:6, color:'#8a92a0', fillOpacity:.6, weight:2})
+        .bindTooltip(e.name).addTo(gKontext);
+    });
+    const lat = parseFloat($('f-lat').value.replace(',','.')), lon = parseFloat($('f-lon').value.replace(',','.'));
+    if(!isNaN(lat) && !isNaN(lon)) setzePunkt(lat, lon, true, true);
+    else if(formOsmPunkt){ setzePunkt(formOsmPunkt[0], formOsmPunkt[1], true);
+      $('g-karte-hinweis').textContent = 'Position von OpenStreetMap vorgeschlagen – bei Bedarf auf die richtige Stelle tippen oder die Nadel verschieben.'; }
+    else{
+      if(gMarker){ gKarte.removeLayer(gMarker); gMarker = null; }
+      gKarte.setView([51.86, 13.99], 11);
+      $('g-karte-hinweis').textContent = 'Auf der Karte auf das Gasthaus tippen. Mit + hineinzoomen für die genaue Stelle.';
+    }
+  }, 50);
 }
 
 // ---------------------------------------------------------------- YAML erzeugen
