@@ -46,6 +46,7 @@ gaststaetten:
 
   - name: "Gasthaus Dubkowmühle"
     osm_name: "Dubkow Mühle"
+    punkt: [51.844745, 14.058803]
     zeiten:
       montag: "11:30-18:00"
       dienstag: "11:30-18:00"
