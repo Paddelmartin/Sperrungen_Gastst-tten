@@ -364,7 +364,9 @@ function renderList(){
     const info = osmZuEintrag(e);
     const osmWoche = info && Object.keys(info.woche||{}).length ? zeitenKurz(info.woche) : '';
     if(info && !info.gefunden && !e.punkt){
-      left.append(el('div','warnzeile','Fehlt auf der Karte: bei OpenStreetMap nicht gefunden. Bitte „Bearbeiten“ → „Koordinaten selbst eintragen“.'));
+      left.append(el('div','warnzeile', info.abfrage === 'fehler'
+        ? 'Fehlt auf der Karte: OpenStreetMap war beim letzten Lauf überlastet, noch nie gefunden. Wird beim nächsten Lauf erneut versucht – sicherer: „Bearbeiten“ → „Koordinaten selbst eintragen“.'
+        : 'Fehlt auf der Karte: bei OpenStreetMap unter diesem Namen nicht gefunden. Bitte „Bearbeiten“ → „Koordinaten selbst eintragen“.'));
     }
     if(e.zeiten && Object.keys(e.zeiten).length){
       left.append(el('div','meta','Eigene Zeiten: ' + zeitenKurz(e.zeiten)));
@@ -407,7 +409,9 @@ function renderOsmListe(){
   Object.entries(osmDaten.eintraege || {}).forEach(([n,info]) => {
     if(info.osm && entries.some(e => e.name === n)) verknuepft.add(info.osm);
   });
-  if(!treffer.length){ box.append(el('div','empty', q ? 'Nichts gefunden.' : 'Keine Einträge.')); return; }
+  if(!treffer.length){ box.append(el('div','empty', q ? 'Nichts gefunden.'
+    : osmDaten.umgebung_status === 'fehler' ? 'OpenStreetMap war beim letzten Lauf überlastet – die Liste erscheint nach dem nächsten erfolgreichen Lauf.'
+    : 'Keine Einträge.')); return; }
   const MAX = 60;
   treffer.slice(0, MAX).forEach(p=>{
     const item = el('div','list-item');
