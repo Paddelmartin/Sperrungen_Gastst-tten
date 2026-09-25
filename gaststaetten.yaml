@@ -44,7 +44,14 @@ gaststaetten:
 
   - name: "Gasthaus Dubkowmühle"
     osm_name: "Dubkowmühle"
-    hinweis: "Leipe. Saisonpause November–März. In der Saison laut Anbieter täglich 11:30–22:00 Uhr, bitte prüfen."
+    zeiten:
+      montag: "11:30-18:00"
+      dienstag: "11:30-18:00"
+      mittwoch: "11:30-18:00"
+      donnerstag: "11:30-18:00"
+      freitag: "11:30-18:00"
+      samstag: "11:30-18:00"
+      sonntag: "11:30-18:00"
 
   - name: "Gasthaus Eiche (Waldhotel Eiche)"
     osm_name: "Waldhotel Eiche"
