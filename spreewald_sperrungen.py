@@ -649,6 +649,7 @@ def load_restaurants(path, day, geo, osm_info=None):
                 oh = osm_tags.get("opening_hours", "")
                 woche, unsicher_w = osm_week_as_zeiten(oh)
                 osm_info[name] = {"gefunden": bool(treffer), "abfrage": geo.letzter_status,
+                                  "punkt": [round(treffer["lat"], 6), round(treffer["lon"], 6)] if treffer else None,
                                   "osm": treffer["osm"] if treffer else "",
                                   "osm_name": osm_tags.get("name", ""), "opening_hours": oh,
                                   "woche": woche, "unsicher": unsicher_w}
