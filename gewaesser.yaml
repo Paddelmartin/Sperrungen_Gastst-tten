@@ -18,6 +18,12 @@
 # Offen: Conradsbrücke (Spree, Brücke 08/78, Burg, Schwarze Ecke 1) - Position fehlt noch.
 
 regeln:
+  - match: "spree / brücke conrads"
+    notiz: "Spree / Brücke Conrads"
+    manual:
+      - point: [51.843464, 14.10339]
+        radius_m: 50
+
   - match: "zeitzfließ"
     bereich: "Zeitzschleuse"
     notiz: "Zeitzschleuse, Wehr 107"
