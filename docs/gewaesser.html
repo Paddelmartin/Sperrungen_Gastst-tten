@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gewässer pflegen | Bootsverleih Richter</title>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<style>
+  :root{ --brand-orange:#EC6D28; --brand-orange-dark:#D25A1B; --brand-blue:#0F63A6; --brand-blue-dark:#0B4C80;
+    --bg:#F5F7FA; --card:#fff; --line:#E1E6EC; --ok:#2e7d32; --err:#b00020; --rot:#d32f2f; --gelb:#ef8a00; }
+  html,body{margin:0;font-family:'Poppins',system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:#2b2f33}
+  .wrap{max-width:760px;margin:0 auto;padding:20px 16px 110px}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  header img{height:40px}
+  h1{font-size:19px;color:var(--brand-blue-dark);margin:0}
+  .sub{color:#6b7480;font-size:13px;margin-bottom:16px;line-height:1.55}
+  .nav{font-size:13px;margin-bottom:16px;display:flex;gap:16px;flex-wrap:wrap}
+  .tabs{display:flex;gap:8px;margin-bottom:16px}
+  .tabs button{flex:1;background:#fff;color:#3a4048;border:1px solid var(--line);padding:11px 10px;line-height:1.3}
+  .tabs button.aktiv{background:var(--brand-blue);color:#fff;border-color:var(--brand-blue)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:18px}
+  .card h2{font-size:15px;color:var(--brand-blue-dark);margin:0 0 12px}
+  .card.editing{border-color:var(--brand-orange);box-shadow:0 0 0 2px rgba(236,109,40,.18)}
+  label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px;color:#3a4048}
+  input[type=text],input[type=password],input[type=date],input[type=number],textarea{width:100%;box-sizing:border-box;
+    padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:13.5px}
+  textarea{min-height:60px;resize:vertical}
+  input:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--brand-blue);outline-offset:2px}
+  .hint{font-size:11.5px;color:#8a92a0;margin-top:3px;line-height:1.5}
+  .radiogroup{display:flex;gap:16px;margin-top:4px;flex-wrap:wrap}
+  .radiogroup label,.check{display:flex;align-items:center;gap:6px;font-weight:400;margin:0}
+  .row2{display:flex;gap:10px;flex-wrap:wrap}
+  .row2>div{flex:1;min-width:140px}
+  button{font-family:inherit;font-size:13.5px;font-weight:600;border:none;border-radius:7px;padding:9px 16px;cursor:pointer}
+  button:disabled{opacity:.5;cursor:default}
+  .btn-primary{background:var(--brand-orange);color:#fff}
+  .btn-primary:hover:not(:disabled){background:var(--brand-orange-dark)}
+  .btn-blue{background:var(--brand-blue);color:#fff}
+  .btn-secondary{background:var(--bg);color:#3a4048;border:1px solid var(--line)}
+  .btn-secondary.an{background:var(--brand-blue);color:#fff;border-color:var(--brand-blue)}
+  .btn-link{background:none;color:var(--brand-blue);padding:4px 8px;font-size:12px}
+  .btn-danger{background:none;color:var(--err);padding:4px 8px;font-size:12px}
+  .item-buttons{display:flex;flex-direction:column;gap:2px;flex:none;align-items:flex-end}
+  .list-item{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border:1px solid var(--line);
+    border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--bg)}
+  .list-item.aktiv{border-color:var(--brand-orange);background:#FFF6F0}
+  .list-item.alt{opacity:.65}
+  .list-item b{display:block;font-size:13.5px}
+  .meta{font-size:12px;color:#6b7480;margin-top:2px;line-height:1.5}
+  .ok-zeile{font-size:12px;color:var(--ok);margin-top:3px}
+  .warnzeile{font-size:12px;color:#9a5b00;margin-top:3px}
+  .fehlzeile{font-size:12px;color:var(--err);margin-top:3px;font-weight:600}
+  .badge{display:inline-block;font-size:10.5px;font-weight:700;color:#fff;border-radius:4px;padding:1px 6px;margin-right:6px;
+    vertical-align:1px;text-transform:uppercase;letter-spacing:.3px}
+  .b-gesperrt{background:var(--rot)} .b-eingeschraenkt,.b-bald{background:var(--gelb)} .b-gebiet{background:#7a8591}
+  .empty{color:#8a92a0;font-size:13px;font-style:italic}
+  #status{font-size:13px;margin-bottom:12px}
+  #status.err{color:var(--err)} #status.ok{color:var(--ok)}
+  #karte{height:380px;border-radius:8px;border:1px solid var(--line);margin-top:8px}
+  .werkzeuge{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}
+  .werkzeuge button{padding:7px 12px;font-size:12.5px}
+  #zeichen-hinweis{font-size:12.5px;color:var(--brand-blue-dark);margin-top:8px;min-height:18px}
+  #formen-liste{margin-top:6px}
+  .form-zeile{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;border-bottom:1px solid var(--line);padding:4px 0}
+  .form-buttons{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap}
+  .osmbox{background:#EEF5FB;border:1px solid #CFE2F2;border-radius:7px;padding:8px 10px;font-size:12.5px;margin-top:10px;line-height:1.55}
+  .trefferbox{border-radius:7px;padding:8px 10px;font-size:12.5px;margin-top:10px;line-height:1.55;background:var(--bg);border:1px solid var(--line)}
+  .savebar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);z-index:1000;
+    box-shadow:0 -2px 8px rgba(20,30,40,.06);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
+  .savebar .inner{max-width:760px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  #save-info{font-size:13px;color:#6b7480}
+  #save-info.dirty{color:#9a5b00;font-weight:600} #save-info.ok{color:var(--ok)} #save-info.err{color:var(--err);font-weight:600}
+  details{margin-top:4px}
+  summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--brand-blue-dark);padding:4px 0}
+  details ol{font-size:13px;line-height:1.7;padding-left:20px;margin:8px 0}
+  #token-status{font-size:12.5px;margin-top:8px}
+  a{color:var(--brand-orange-dark)}
+  code{font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="logo.png" alt="Bootsverleih Richter">
+    <h1>Gewässer pflegen</h1>
+  </header>
+  <div class="nav"><a href="index.html">Zur Sperrkarte</a><a href="erfassen.html">Gaststätten pflegen</a></div>
+  <div class="sub">Änderungen werden erst mit „Bei GitHub speichern“ übernommen; die Karte baut sich danach in
+    wenigen Minuten neu.</div>
+
+  <div class="tabs">
+    <button id="tab-eigene" class="aktiv" onclick="zeigeTab('eigene')">Eigene Sperrungen</button>
+    <button id="tab-regeln" onclick="zeigeTab('regeln')">Kartenpositionen der LBV-Sperrungen</button>
+  </div>
+
+  <div id="status">Lade aktuelle Daten …</div>
+
+  <!-- ============================================================ Eigene Sperrungen -->
+  <section id="bereich-eigene">
+    <div class="card">
+      <h2>Eure eigenen Hinweise</h2>
+      <div class="sub" style="margin-bottom:10px">Zum Beispiel ein umgestürzter Baum, den ihr heute Morgen entdeckt habt.
+        Erscheinen auf der Karte als „Eigener Hinweis“, nicht als LBV-Meldung.</div>
+      <div id="eigene-liste"></div>
+    </div>
+
+    <div class="card" id="eigene-form">
+      <h2 id="eigene-titel">Neuen Hinweis anlegen</h2>
+      <label for="e-gewaesser">Gewässer *</label>
+      <input type="text" id="e-gewaesser" placeholder="z. B. Lehder Fließ">
+      <label for="e-bereich">Stelle</label>
+      <input type="text" id="e-bereich" placeholder="z. B. Höhe Angelsteg, kurz vor der Brücke">
+      <label>Art</label>
+      <div class="radiogroup">
+        <label><input type="radio" name="e-status" value="gesperrt" checked> Gesperrt</label>
+        <label><input type="radio" name="e-status" value="eingeschraenkt"> Eingeschränkt</label>
+      </div>
+      <div class="row2">
+        <div><label for="e-von">Von</label><input type="date" id="e-von"><div class="hint">leer = ab sofort</div></div>
+        <div><label for="e-bis">Bis</label><input type="date" id="e-bis"><div class="hint">leer = bis auf Weiteres</div></div>
+      </div>
+      <label for="e-grund">Grund</label>
+      <input type="text" id="e-grund" placeholder="z. B. Umgestürzter Baum">
+      <label for="e-hinweis">Hinweis</label>
+      <textarea id="e-hinweis" placeholder="z. B. Fließ komplett versperrt, bitte an der nächsten Brücke umtragen."></textarea>
+      <label>Position auf der Karte *</label>
+      <div id="platz-eigene"></div>
+      <div class="form-buttons">
+        <button class="btn-primary" id="e-btn" onclick="eigeneUebernehmen()">Zur Liste hinzufügen</button>
+        <button class="btn-secondary" id="e-abbrechen" onclick="eigeneAbbrechen()" style="display:none">Abbrechen</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ Kartenpositionen -->
+  <section id="bereich-regeln" style="display:none">
+    <div class="card">
+      <h2>Aktuelle LBV-Sperrungen</h2>
+      <div class="sub" style="margin-bottom:10px" id="lbv-stand">Stand des letzten Laufs der Karte.</div>
+      <div id="lbv-liste"></div>
+    </div>
+
+    <div class="card" id="regel-form">
+      <h2 id="regel-titel">Kartenposition festlegen</h2>
+      <div class="sub" id="regel-leer" style="margin:0">Oben bei einer Sperrung auf „Position einzeichnen“ oder
+        „Position bearbeiten“ tippen, oder unten eine Regel aus der Liste bearbeiten.</div>
+      <div id="regel-felder" style="display:none">
+        <label for="r-match">Gewässer-Stichwort *</label>
+        <input type="text" id="r-match" oninput="regelTrefferZeigen()">
+        <div class="hint">Muss im Feld „Gewässer“ der LBV-Seite vorkommen (Groß-/Kleinschreibung egal).</div>
+        <label for="r-bereich">Bereich-Stichwort</label>
+        <input type="text" id="r-bereich" oninput="regelTrefferZeigen()">
+        <div class="hint">Ein Wort aus dem Feld „Bereich“, z. B. „Wehrkanal“. Dann gilt die Position nur für diese Stelle.
+          Leer lassen = gilt für jede Sperrung auf diesem Gewässer.</div>
+        <div id="r-treffer" class="trefferbox"></div>
+        <label for="r-notiz">Notiz (nur für euch)</label>
+        <input type="text" id="r-notiz" placeholder="z. B. Schleuse Kannomühle, Wehr 52">
+        <label class="check" style="margin-top:12px"><input type="checkbox" id="r-ungefaehr"> Nur ungefähr eingezeichnet
+          (Hinweis im Popup)</label>
+        <div id="r-osm" class="osmbox" style="display:none"></div>
+        <label>Von Hand einzeichnen</label>
+        <div id="platz-regeln"></div>
+        <div class="form-buttons">
+          <button class="btn-primary" id="r-btn" onclick="regelUebernehmen()">Übernehmen</button>
+          <button class="btn-secondary" onclick="regelAbbrechen()">Abbrechen</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <details id="regeln-details">
+        <summary>Alle Regeln anzeigen (<span id="regel-anzahl">0</span>)</summary>
+        <div class="sub" style="margin:8px 0">Die erste passende Regel gewinnt – spezielle Regeln (mit Bereich) gehören
+          nach oben.</div>
+        <div id="regel-liste"></div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============================================================ Speichern einrichten -->
+  <div class="card">
+    <h2>Speichern einrichten</h2>
+    <div class="sub" style="margin-bottom:6px">Wer auf „Gaststätten pflegen“ schon eingerichtet ist, muss hier nichts tun –
+      der Schlüssel gilt für beide Seiten.</div>
+    <details id="token-details">
+      <summary id="token-summary">Zugangsschlüssel eintragen</summary>
+      <ol>
+        <li>Bei GitHub <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">einen
+          Fine-grained token anlegen</a>.</li>
+        <li>Repository access: <b>Only select repositories</b> → <code id="repo-name-hilfe"></code>.</li>
+        <li>Permissions → <b>Contents: Read and write</b>. Sonst nichts.</li>
+        <li>Schlüssel kopieren und hier einfügen.</li>
+      </ol>
+      <input type="password" id="f-token" placeholder="github_pat_…" autocomplete="off">
+      <div class="form-buttons" style="margin-top:10px">
+        <button class="btn-blue" onclick="tokenSpeichern()">Schlüssel prüfen und merken</button>
+        <button class="btn-secondary" onclick="tokenEntfernen()">Von diesem Gerät entfernen</button>
+      </div>
+      <div id="token-status"></div>
+    </details>
+  </div>
+
+  <!-- Karte (wird in das jeweils offene Formular verschoben) -->
+  <div id="karten-block">
+    <div class="werkzeuge">
+      <button type="button" class="btn-secondary" id="w-punkt" onclick="setzeModus('punkt')">Punkt setzen</button>
+      <button type="button" class="btn-secondary" id="w-linie" onclick="setzeModus('linie')">Linie zeichnen</button>
+      <span id="w-linie-aktionen" style="display:none">
+        <button type="button" class="btn-secondary" onclick="linieZurueck()">Letzten Punkt zurück</button>
+        <button type="button" class="btn-primary" onclick="linieFertig()">Linie fertig</button>
+      </span>
+      <span id="w-radius" style="display:none;font-size:12.5px">Kreis
+        <input type="number" id="w-radius-wert" min="20" max="2000" step="10" value="150" style="width:80px;padding:5px 6px"> m</span>
+    </div>
+    <div id="zeichen-hinweis"></div>
+    <div id="karte"></div>
+    <div id="formen-liste"></div>
+    <div class="hint">Graue Linien und Kreise: was heute schon auf der Karte steht (zur Orientierung).</div>
+  </div>
+</div>
+
+<div class="savebar"><div class="inner">
+  <span id="save-info">Alles gespeichert.</span>
+  <button class="btn-primary" id="btn-save" onclick="speichern()" disabled>Bei GitHub speichern</button>
+</div></div>
+
+<script>
+// ================================================================ Grundlagen
+const REPO = (()=>{
+  const h = location.hostname, teile = location.pathname.split('/').filter(Boolean);
+  if(h.endsWith('.github.io') && teile.length) return h.split('.')[0] + '/' + teile[0];
+  return 'Paddelmartin/Sperrungen_Gastst-tten';
+})();
+const BRANCH = 'main', TOKEN_KEY = 'sperrkarte_github_token';
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls;
+  if(text != null) e.textContent = text; return e; };
+const token = () => { try{ return localStorage.getItem(TOKEN_KEY) || ''; }catch(_){ return ''; } };
+const q = s => JSON.stringify(String(s));          // doppelt gequoteter YAML-Text
+const pt = p => `[${p[0]}, ${p[1]}]`;
+const r6 = x => Math.round(x * 1e6) / 1e6;
+
+function apiHeaders(){
+  const h = {'Accept':'application/vnd.github+json'};
+  if(token()) h['Authorization'] = 'Bearer ' + token();
+  return h;
+}
+function b64ZuText(b64){
+  const bin = atob(b64.replace(/\s/g,''));
+  return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+}
+function textZuB64(text){
+  const bytes = new TextEncoder().encode(text); let bin = '';
+  for(let i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+async function ladeDatei(pfad){
+  try{
+    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${pfad}?ref=${BRANCH}`, {headers: apiHeaders(), cache:'no-store'});
+    if(res.status === 404) return {text:'', sha:null};
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const js = await res.json();
+    return {text: b64ZuText(js.content), sha: js.sha};
+  }catch(err){
+    const res = await fetch(`https://raw.githubusercontent.com/${REPO}/${BRANCH}/${pfad}?t=${Date.now()}`, {cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    return {text: await res.text(), sha: null};
+  }
+}
+
+// ================================================================ Dateien
+const HEADER_EIGENE = `# Eigene Sperrungen / Hinweise
+# ==============================
+# Zusätzliche Sperrungen, die (noch) nicht auf der LBV-Seite stehen - z. B. ein umgestürzter Baum.
+# Am bequemsten über die Seite gewaesser.html pflegen (Karte zum Anklicken, Speichern direkt bei GitHub).
+#
+#   - Diese Einträge kommen NICHT von der LBV und werden auf der Karte als "Eigener Hinweis" gekennzeichnet.
+#   - Nach dem Datum "bis" verschwindet ein Eintrag von selbst von der Karte; hier bleibt er stehen,
+#     bis ihr ihn löscht. Löscht ihn auch, sobald die LBV dieselbe Sperrung veröffentlicht (sonst doppelt).
+#
+# Felder: gewaesser, bereich, von/bis (TT.MM.JJJJ), status ("gesperrt"/"eingeschraenkt"), grund, hinweis,
+#         punkt: [Breite, Länge] mit radius_m  ODER  linie: [[Breite, Länge], ...]
+
+hinweise:
+`;
+const HEADER_REGELN = `# Kartenpositionen der LBV-Sperrungen
+# ===================================
+# Hier steht, WO eine Sperrung von der LBV-Seite auf der Karte eingezeichnet wird.
+# Am bequemsten über die Seite gewaesser.html pflegen (Karte zum Anklicken, Speichern direkt bei GitHub).
+#
+# Eine Regel passt, wenn 'match' im Feld "Gewässer" der LBV-Seite vorkommt UND 'bereich' (falls
+# angegeben) im Feld "Bereich". Die ERSTE passende Regel gewinnt - spezielle Regeln also nach oben.
+#
+#   manual      von Hand eingezeichnet, hat Vorrang vor OpenStreetMap:
+#                 - point: [Breite, Länge] mit radius_m   -> Kreis um eine Stelle
+#                 - line:  [[Breite, Länge], ...]         -> Linie entlang eines Abschnitts
+#   ways        sonst: Wasserwege dieses Namens aus OpenStreetMap
+#   ways_regex  Rückfall-Suchmuster für andere Schreibweisen in OpenStreetMap
+#   near        nur den Teil in der Nähe dieses Orts zeigen (mit radius_m)
+#   genau       false -> im Popup steht "Abschnitt nur ungefähr eingezeichnet"
+#   notiz       nur für euch, erscheint nicht auf der Karte
+#
+# Offen: Conradsbrücke (Spree, Brücke 08/78, Burg, Schwarze Ecke 1) - Position fehlt noch.
+
+regeln:
+`;
+const EIGENE_FELDER = ['gewaesser','bereich','von','bis','status','grund','hinweis','punkt','radius_m','linie'];
+const REGEL_FELDER = ['match','bereich','genau','notiz','manual','ways','ways_regex','near','radius_m'];
+
+function extraFelder(e, bekannt){
+  return Object.keys(e).filter(k => !bekannt.includes(k)).map(k =>
+    jsyaml.dump({[k]: e[k]}, {lineWidth:-1}).split('\n').filter(Boolean).map(z => '    ' + z).join('\n') + '\n').join('');
+}
+function renderEigene(liste){
+  let out = HEADER_EIGENE;
+  if(!liste.length) out += '  []\n';
+  liste.forEach(e=>{
+    out += `  - gewaesser: ${q(e.gewaesser)}\n`;
+    if(e.bereich) out += `    bereich: ${q(e.bereich)}\n`;
+    if(e.von) out += `    von: ${q(e.von)}\n`;
+    if(e.bis) out += `    bis: ${q(e.bis)}\n`;
+    out += `    status: ${q(e.status || 'gesperrt')}\n`;
+    if(e.grund) out += `    grund: ${q(e.grund)}\n`;
+    if(e.hinweis) out += `    hinweis: ${q(e.hinweis)}\n`;
+    if(e.punkt){ out += `    punkt: ${pt(e.punkt)}\n    radius_m: ${e.radius_m || 200}\n`; }
+    else if(e.linie) out += `    linie: [${e.linie.map(pt).join(', ')}]\n`;
+    out += extraFelder(e, EIGENE_FELDER) + '\n';
+  });
+  return out;
+}
+function renderRegeln(liste){
+  let out = HEADER_REGELN;
+  liste.forEach(r=>{
+    out += `  - match: ${q(r.match)}\n`;
+    if(r.bereich) out += `    bereich: ${q(r.bereich)}\n`;
+    if(r.genau === false) out += `    genau: false\n`;
+    if(r.notiz) out += `    notiz: ${q(r.notiz)}\n`;
+    if(r.manual && r.manual.length){
+      out += `    manual:\n`;
+      r.manual.forEach(m=>{
+        if(m.point) out += `      - point: ${pt(m.point)}\n        radius_m: ${m.radius_m || 200}\n`;
+        else if(m.line) out += `      - line: [${m.line.map(pt).join(', ')}]\n`;
+      });
+    }
+    if(r.ways && r.ways.length) out += `    ways: [${r.ways.map(q).join(', ')}]\n`;
+    if(r.ways_regex) out += `    ways_regex: ${q(r.ways_regex)}\n`;
+    if(r.near) out += `    near: ${q(r.near)}\n`;
+    if(r.radius_m != null) out += `    radius_m: ${r.radius_m}\n`;
+    out += extraFelder(r, REGEL_FELDER) + '\n';
+  });
+  return out;
+}
+
+const DATEIEN = {
+  eigene: {pfad:'eigene-sperrungen.yaml', schluessel:'hinweise', liste:[], text:'', sha:null, geladen:false,
+           render: renderEigene, nachricht:'Eigene Sperrungen über gewaesser.html aktualisiert'},
+  regeln: {pfad:'gewaesser.yaml', schluessel:'regeln', liste:[], text:'', sha:null, geladen:false,
+           render: renderRegeln, nachricht:'Kartenpositionen über gewaesser.html aktualisiert'},
+};
+let lbvDaten = null;   // sperrungen.json vom letzten Lauf
+
+async function laden(){
+  const fehler = [];
+  for(const [name, d] of Object.entries(DATEIEN)){
+    try{
+      const f = await ladeDatei(d.pfad);
+      const js = jsyaml.load(f.text) || {};
+      d.liste = Array.isArray(js[d.schluessel]) ? js[d.schluessel] : [];
+      d.sha = f.sha; d.text = d.render(d.liste); d.geladen = true;
+    }catch(err){ fehler.push(`${d.pfad}: ${err.message}`); }
+  }
+  try{
+    const res = await fetch('sperrungen.json?t=' + Date.now(), {cache:'no-store'});
+    if(res.ok) lbvDaten = await res.json();
+  }catch(_){}
+  if(fehler.length){
+    $('status').className = 'err';
+    $('status').textContent = 'Nicht alles konnte geladen werden (' + fehler.join('; ') + '). Bitte Seite neu laden.';
+  }else{
+    $('status').className = 'ok';
+    $('status').textContent = `Geladen aus ${REPO}: ${DATEIEN.eigene.liste.length} eigene Hinweise, ${DATEIEN.regeln.liste.length} Kartenregeln.`;
+  }
+  kontextZeichnen(); aktualisiere();
+}
+
+// ================================================================ Karte + Zeichnen
+let karte, kontextLayer, formenLayer;
+let formen = [];            // [{t:'punkt', c:[lat,lon], r}] oder [{t:'linie', c:[[lat,lon],...]}]
+let mehrereFormen = false;  // eigene Hinweise: genau eine Form; Kartenregeln: beliebig viele
+let modus = null, entwurf = [];
+
+function karteAnlegen(){
+  karte = L.map('karte').setView([51.86, 13.99], 11);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {maxZoom: 19, attribution: '© OpenStreetMap-Mitwirkende'}).addTo(karte);
+  kontextLayer = L.layerGroup().addTo(karte);
+  formenLayer = L.layerGroup().addTo(karte);
+  karte.on('click', e => karteGeklickt([r6(e.latlng.lat), r6(e.latlng.lng)]));
+  $('w-radius-wert').addEventListener('input', ()=>{
+    const r = parseInt($('w-radius-wert').value, 10);
+    if(r > 0){ const letzter = [...formen].reverse().find(f => f.t === 'punkt'); if(letzter){ letzter.r = r; formenZeichnen(); } }
+  });
+}
+function kontextZeichnen(){
+  kontextLayer.clearLayers();
+  if(!lbvDaten) return;
+  (lbvDaten.items || []).forEach(i => (i.geom || []).forEach(g=>{
+    const opt = {color:'#8a92a0', weight:3, opacity:.6, fillOpacity:.08, interactive:false};
+    if(g.t === 'line') L.polyline(g.c, opt).addTo(kontextLayer);
+    if(g.t === 'circle') L.circle(g.c, {...opt, radius: g.r}).addTo(kontextLayer);
+  }));
+}
+function karteEinsetzen(platzId, einzeln){
+  $(platzId).append($('karten-block'));
+  mehrereFormen = !einzeln;
+  setTimeout(()=> karte.invalidateSize(), 50);
+}
+function setzeModus(m){
+  if(modus === 'linie' && entwurf.length > 1 && m !== 'linie') linieFertig();
+  modus = (modus === m) ? null : m; entwurf = [];
+  $('w-punkt').classList.toggle('an', modus === 'punkt');
+  $('w-linie').classList.toggle('an', modus === 'linie');
+  $('w-linie-aktionen').style.display = modus === 'linie' ? '' : 'none';
+  $('w-radius').style.display = (modus === 'punkt' || formen.some(f => f.t === 'punkt')) ? '' : 'none';
+  $('zeichen-hinweis').textContent = modus === 'punkt' ? 'Auf die Stelle in der Karte tippen.'
+    : modus === 'linie' ? 'Den Abschnitt Punkt für Punkt entlang des Wasserlaufs antippen, dann „Linie fertig“.'
+    : '';
+  formenZeichnen();
+}
+function karteGeklickt(p){
+  if(modus === 'punkt'){
+    const f = {t:'punkt', c:p, r: parseInt($('w-radius-wert').value, 10) || 150};
+    if(mehrereFormen) formen.push(f); else formen = [f];
+    setzeModus(null); $('w-radius').style.display = '';
+  }else if(modus === 'linie'){
+    entwurf.push(p);
+    $('zeichen-hinweis').textContent = `${entwurf.length} Punkt(e) gesetzt. Weiter antippen oder „Linie fertig“.`;
+  }
+  formenZeichnen();
+}
+function linieZurueck(){ entwurf.pop(); formenZeichnen(); }
+function linieFertig(){
+  if(entwurf.length < 2){ alert('Eine Linie braucht mindestens zwei Punkte.'); return; }
+  const f = {t:'linie', c: entwurf.slice()};
+  if(mehrereFormen) formen.push(f); else formen = [f];
+  entwurf = []; setzeModus(null);
+}
+function formenZeichnen(){
+  formenLayer.clearLayers();
+  formen.forEach(f=>{
+    if(f.t === 'punkt') L.circle(f.c, {radius: f.r, color:'#d32f2f', weight:3, fillOpacity:.2}).addTo(formenLayer);
+    else L.polyline(f.c, {color:'#d32f2f', weight:5}).addTo(formenLayer);
+  });
+  if(entwurf.length){
+    L.polyline(entwurf, {color:'#EC6D28', weight:4, dashArray:'6 6'}).addTo(formenLayer);
+    entwurf.forEach(p => L.circleMarker(p, {radius:4, color:'#EC6D28', fillOpacity:1}).addTo(formenLayer));
+  }
+  const box = $('formen-liste'); box.textContent = '';
+  formen.forEach((f,i)=>{
+    const z = el('div','form-zeile');
+    z.append(el('span', null, f.t === 'punkt' ? `Kreis ${f.r} m um ${f.c[0]}, ${f.c[1]}` : `Linie mit ${f.c.length} Punkten`));
+    const b = el('button','btn-danger','Entfernen'); b.type = 'button';
+    b.onclick = () => { formen.splice(i,1); formenZeichnen(); };
+    z.append(b); box.append(z);
+  });
+}
+function formenSetzen(neu){
+  formen = neu; modus = null; entwurf = []; setzeModus(null);
+  const alle = formen.flatMap(f => f.t === 'punkt' ? [f.c] : f.c);
+  if(alle.length === 1) karte.setView(alle[0], 15);
+  else if(alle.length) karte.fitBounds(alle, {padding:[30,30], maxZoom:16});
+}
+function zeigeGeometrie(geom){          // vorhandene OSM-Linie (grau hervorgehoben) zur Orientierung anfliegen
+  const alle = (geom || []).flatMap(g => g.t === 'line' ? g.c : [g.c]);
+  if(alle.length === 1) karte.setView(alle[0], 15); else if(alle.length) karte.fitBounds(alle, {padding:[30,30], maxZoom:16});
+}
+
+// ================================================================ Reiter
+let aktiverTab = 'eigene';
+function zeigeTab(t){
+  aktiverTab = t;
+  $('tab-eigene').classList.toggle('aktiv', t === 'eigene');
+  $('tab-regeln').classList.toggle('aktiv', t === 'regeln');
+  $('bereich-eigene').style.display = t === 'eigene' ? '' : 'none';
+  $('bereich-regeln').style.display = t === 'regeln' ? '' : 'none';
+  if(t === 'eigene') karteEinsetzen('platz-eigene', true);
+  else if(regelIndex !== undefined) karteEinsetzen('platz-regeln', false);
+}
+
+// ================================================================ Eigene Sperrungen
+let eigeneIndex = null;
+const heute = () => new Date().toISOString().slice(0,10);
+const zuIso = t => { const m = String(t||'').match(/^(\d{2})\.(\d{2})\.(\d{4})$/); return m ? `${m[3]}-${m[2]}-${m[1]}` : ''; };
+const zuDe = iso => { const m = String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[3]}.${m[2]}.${m[1]}` : ''; };
+
+function renderEigeneListe(){
+  const box = $('eigene-liste'); box.textContent = '';
+  const liste = DATEIEN.eigene.liste;
+  if(!liste.length){ box.append(el('div','empty','Keine eigenen Hinweise eingetragen.')); return; }
+  liste.forEach((e,i)=>{
+    const abgelaufen = e.bis && zuIso(e.bis) && zuIso(e.bis) < heute();
+    const item = el('div', 'list-item' + (i === eigeneIndex ? ' aktiv' : '') + (abgelaufen ? ' alt' : ''));
+    const left = el('div');
+    const titel = el('b');
+    titel.append(el('span', 'badge b-' + (e.status || 'gesperrt'), e.status === 'eingeschraenkt' ? 'eingeschränkt' : 'gesperrt'),
+                 document.createTextNode(e.gewaesser));
+    left.append(titel);
+    if(e.bereich) left.append(el('div','meta', e.bereich));
+    const zeit = e.von && e.bis ? `${e.von} bis ${e.bis}` : e.von ? `ab ${e.von}` : e.bis ? `bis ${e.bis}` : 'bis auf Weiteres';
+    left.append(el('div','meta', zeit + (e.grund ? ' · ' + e.grund : '')));
+    if(abgelaufen) left.append(el('div','warnzeile','Abgelaufen – erscheint nicht mehr auf der Karte. Kann entfernt werden.'));
+    else if(!e.punkt && !e.linie) left.append(el('div','fehlzeile','Keine Position – erscheint ohne Markierung.'));
+    const buttons = el('div','item-buttons');
+    const b1 = el('button','btn-link','Bearbeiten'); b1.onclick = () => eigeneBearbeiten(i);
+    const b2 = el('button','btn-danger','Entfernen');
+    b2.onclick = () => {
+      if(!confirm(`Hinweis „${e.gewaesser}“ entfernen?`)) return;
+      if(eigeneIndex === i) eigeneAbbrechen(); else if(eigeneIndex !== null && eigeneIndex > i) eigeneIndex--;
+      liste.splice(i,1); aktualisiere();
+    };
+    buttons.append(b1, b2); item.append(left, buttons); box.append(item);
+  });
+}
+function eigeneFormLeeren(){
+  ['e-gewaesser','e-bereich','e-von','e-bis','e-grund','e-hinweis'].forEach(id => $(id).value = '');
+  document.querySelector('input[name=e-status][value=gesperrt]').checked = true;
+  formenSetzen([]);
+}
+function eigeneBearbeiten(i){
+  eigeneIndex = i; const e = DATEIEN.eigene.liste[i];
+  eigeneFormLeeren();
+  $('e-gewaesser').value = e.gewaesser || ''; $('e-bereich').value = e.bereich || '';
+  $('e-von').value = zuIso(e.von); $('e-bis').value = zuIso(e.bis);
+  $('e-grund').value = e.grund || ''; $('e-hinweis').value = e.hinweis || '';
+  document.querySelector(`input[name=e-status][value=${e.status === 'eingeschraenkt' ? 'eingeschraenkt' : 'gesperrt'}]`).checked = true;
+  if(e.punkt){ $('w-radius-wert').value = e.radius_m || 200; formenSetzen([{t:'punkt', c:e.punkt, r:e.radius_m || 200}]); }
+  else if(e.linie) formenSetzen([{t:'linie', c:e.linie}]);
+  eigeneModus(); renderEigeneListe();
+  $('eigene-form').scrollIntoView({behavior:'smooth', block:'start'});
+}
+function eigeneAbbrechen(){ eigeneIndex = null; eigeneFormLeeren(); eigeneModus(); renderEigeneListe(); }
+function eigeneModus(){
+  const b = eigeneIndex !== null;
+  $('eigene-titel').textContent = b ? 'Hinweis bearbeiten' : 'Neuen Hinweis anlegen';
+  $('e-btn').textContent = b ? 'Änderungen übernehmen' : 'Zur Liste hinzufügen';
+  $('e-abbrechen').style.display = b ? '' : 'none';
+  $('eigene-form').classList.toggle('editing', b);
+}
+function eigeneUebernehmen(){
+  if(modus === 'linie' && entwurf.length > 1) linieFertig();
+  const gew = $('e-gewaesser').value.trim();
+  if(!gew){ alert('Bitte das Gewässer eintragen.'); return; }
+  if(!formen.length){ alert('Bitte die Stelle auf der Karte markieren („Punkt setzen“ oder „Linie zeichnen“).'); return; }
+  const von = $('e-von').value, bis = $('e-bis').value;
+  if(von && bis && bis < von){ alert('„Bis“ liegt vor „Von“.'); return; }
+  const basis = eigeneIndex !== null ? {...DATEIEN.eigene.liste[eigeneIndex]} : {};
+  EIGENE_FELDER.forEach(f => delete basis[f]);
+  const e = {gewaesser: gew};
+  const bereich = $('e-bereich').value.trim(); if(bereich) e.bereich = bereich;
+  if(von) e.von = zuDe(von); if(bis) e.bis = zuDe(bis);
+  e.status = document.querySelector('input[name=e-status]:checked').value;
+  const grund = $('e-grund').value.trim(); if(grund) e.grund = grund;
+  const hinweis = $('e-hinweis').value.trim(); if(hinweis) e.hinweis = hinweis;
+  const f = formen[0];
+  if(f.t === 'punkt'){ e.punkt = f.c; e.radius_m = f.r; } else e.linie = f.c;
+  Object.assign(e, basis);
+  if(eigeneIndex !== null) DATEIEN.eigene.liste[eigeneIndex] = e; else DATEIEN.eigene.liste.unshift(e);
+  eigeneIndex = null; eigeneFormLeeren(); eigeneModus(); aktualisiere();
+}
+
+// ================================================================ Kartenregeln
+let regelIndex = undefined;   // undefined = Formular zu, null = neue Regel, Zahl = bestehende Regel
+let regelLbv = null;          // LBV-Eintrag, von dem aus das Formular geöffnet wurde
+
+function findeRegel(item, regeln){
+  const g = String(item.gewaesser||'').toLowerCase(), b = String(item.bereich||'').toLowerCase();
+  return regeln.findIndex(r => g.includes(String(r.match||'').toLowerCase()) && b.includes(String(r.bereich||'').toLowerCase()));
+}
+function regelArt(r){
+  if(r.manual && r.manual.length) return 'von Hand eingezeichnet';
+  if(r.ways || r.ways_regex) return 'automatisch aus OpenStreetMap';
+  if(r.near) return 'automatisch (Ort aus OpenStreetMap)';
+  return 'ohne Position';
+}
+function lbvItems(){ return lbvDaten ? (lbvDaten.items || []).filter(i => i.quelle !== 'eigen') : []; }
+
+function renderLbvListe(){
+  const box = $('lbv-liste'); box.textContent = '';
+  if(!lbvDaten){ box.append(el('div','empty','Die Daten des letzten Laufs konnten nicht geladen werden.')); return; }
+  $('lbv-stand').textContent = `Stand des letzten Laufs der Karte: ${lbvDaten.erzeugt || ''} Uhr.`;
+  const items = lbvItems();
+  if(!items.length){ box.append(el('div','empty','Derzeit keine LBV-Sperrungen.')); return; }
+  const regeln = DATEIEN.regeln.liste;
+  items.forEach(i=>{
+    const item = el('div','list-item');
+    const left = el('div');
+    const titel = el('b');
+    const st = i.status || '';
+    titel.append(el('span','badge b-' + st, st === 'eingeschraenkt' ? 'eingeschränkt' : st === 'bald' ? 'demnächst' : st),
+                 document.createTextNode(i.gewaesser));
+    left.append(titel, el('div','meta', i.bereich));
+    const ri = findeRegel(i, regeln);
+    if(st === 'gebiet'){
+      left.append(el('div','meta','Gilt für das ganze Gebiet – wird nicht eingezeichnet.'));
+    }else if(i.geom && i.geom.length){
+      left.append(el('div','ok-zeile', '✓ Auf der Karte' + (ri >= 0 ? ' – ' + regelArt(regeln[ri]) : '')));
+    }else if(ri >= 0 && regeln[ri].manual && regeln[ri].manual.length){
+      left.append(el('div','ok-zeile','✓ Von Hand eingezeichnet – erscheint nach dem Speichern auf der Karte.'));
+    }else{
+      left.append(el('div','fehlzeile', ri >= 0
+        ? `✗ Nicht auf der Karte – Regel „${regeln[ri].match}“ (${regelArt(regeln[ri])}) hat nichts gefunden.`
+        : '✗ Nicht auf der Karte – es gibt noch keine Regel dafür.'));
+    }
+    item.append(left);
+    if(st !== 'gebiet'){
+      const buttons = el('div','item-buttons');
+      const b = el('button','btn-link', ri >= 0 ? 'Position bearbeiten' : 'Position einzeichnen');
+      b.onclick = () => regelOeffnen(ri >= 0 ? ri : null, i);
+      buttons.append(b); item.append(buttons);
+    }
+    box.append(item);
+  });
+}
+
+function renderRegelListe(){
+  const box = $('regel-liste'); box.textContent = '';
+  const regeln = DATEIEN.regeln.liste;
+  $('regel-anzahl').textContent = regeln.length;
+  regeln.forEach((r,i)=>{
+    const item = el('div','list-item' + (i === regelIndex ? ' aktiv' : ''));
+    const left = el('div');
+    left.append(el('b', null, `${i+1}. ${r.match}` + (r.bereich ? ` · Bereich „${r.bereich}“` : '')));
+    left.append(el('div','meta', regelArt(r) + (r.notiz ? ' · ' + r.notiz : '')));
+    const buttons = el('div','item-buttons');
+    const b1 = el('button','btn-link','Bearbeiten'); b1.onclick = () => regelOeffnen(i, null);
+    const hoch = el('button','btn-link','↑ nach oben'); hoch.disabled = i === 0;
+    hoch.onclick = () => regelVerschieben(i, -1);
+    const runter = el('button','btn-link','↓ nach unten'); runter.disabled = i === regeln.length - 1;
+    runter.onclick = () => regelVerschieben(i, 1);
+    const b2 = el('button','btn-danger','Entfernen');
+    b2.onclick = () => {
+      if(!confirm(`Regel „${r.match}“ entfernen? Betroffene Sperrungen erscheinen dann ohne Position.`)) return;
+      if(regelIndex === i) regelAbbrechen(); else if(typeof regelIndex === 'number' && regelIndex > i) regelIndex--;
+      regeln.splice(i,1); aktualisiere();
+    };
+    buttons.append(b1, hoch, runter, b2); item.append(left, buttons); box.append(item);
+  });
+}
+function regelVerschieben(i, d){
+  const regeln = DATEIEN.regeln.liste, j = i + d;
+  [regeln[i], regeln[j]] = [regeln[j], regeln[i]];
+  if(regelIndex === i) regelIndex = j; else if(regelIndex === j) regelIndex = i;
+  aktualisiere();
+}
+
+function standardMatch(gew){
+  return String(gew).replace(/\([^)]*\)/g,'').trim().toLowerCase();
+}
+function regelOeffnen(index, lbvItem){
+  regelIndex = index; regelLbv = lbvItem;
+  const r = index !== null ? DATEIEN.regeln.liste[index] : null;
+  $('regel-leer').style.display = 'none'; $('regel-felder').style.display = '';
+  $('r-match').value = r ? r.match : standardMatch(lbvItem.gewaesser);
+  $('r-bereich').value = r ? (r.bereich || '') : '';
+  $('r-notiz').value = r ? (r.notiz || '') : '';
+  $('r-ungefaehr').checked = r ? r.genau === false : false;
+  // OSM-Teil der Regel anzeigen (bleibt erhalten; eine Handzeichnung hat Vorrang)
+  const osm = $('r-osm'); osm.textContent = '';
+  if(r && (r.ways || r.ways_regex || r.near)){
+    osm.style.display = '';
+    osm.append(el('div', null, 'Diese Regel sucht außerdem automatisch bei OpenStreetMap' +
+      (r.ways ? ': ' + r.ways.join(' / ') : '') + (r.near ? ` (nur nahe „${r.near}“)` : '') + '.'));
+    osm.append(el('div', null, 'Zeichnet ihr unten etwas ein, gilt eure Zeichnung statt der OSM-Suche. ' +
+      'Ohne Zeichnung bleibt es bei OpenStreetMap.'));
+  }else osm.style.display = 'none';
+
+  karteEinsetzen('platz-regeln', false);
+  const vorhandene = r && r.manual ? r.manual.map(m => m.point ? {t:'punkt', c:m.point, r:m.radius_m || 200} : {t:'linie', c:m.line}) : [];
+  formenSetzen(vorhandene);
+  if(!vorhandene.length && lbvItem && lbvItem.geom) zeigeGeometrie(lbvItem.geom);
+  $('regel-titel').textContent = index !== null ? `Regel „${r.match}“ bearbeiten` : 'Neue Kartenposition';
+  $('r-btn').textContent = index !== null ? 'Änderungen übernehmen' : 'Regel anlegen';
+  $('regel-form').classList.add('editing');
+  regelTrefferZeigen(); renderRegelListe();
+  $('regel-form').scrollIntoView({behavior:'smooth', block:'start'});
+}
+function regelAbbrechen(){
+  regelIndex = undefined; regelLbv = null;
+  $('regel-leer').style.display = ''; $('regel-felder').style.display = 'none';
+  $('regel-form').classList.remove('editing');
+  $('regel-titel').textContent = 'Kartenposition festlegen';
+  $('bereich-eigene').querySelector('#platz-eigene').append($('karten-block'));  // Karte parken
+  formenSetzen([]); renderRegelListe();
+}
+function regelEntwurf(){
+  const basis = typeof regelIndex === 'number' ? {...DATEIEN.regeln.liste[regelIndex]} : {};
+  ['match','bereich','genau','notiz','manual'].forEach(f => delete basis[f]);
+  const r = {match: $('r-match').value.trim().toLowerCase()};
+  const bereich = $('r-bereich').value.trim(); if(bereich) r.bereich = bereich;
+  if($('r-ungefaehr').checked) r.genau = false;
+  const notiz = $('r-notiz').value.trim(); if(notiz) r.notiz = notiz;
+  if(formen.length) r.manual = formen.map(f => f.t === 'punkt' ? {point: f.c, radius_m: f.r} : {line: f.c});
+  return Object.assign(r, basis);
+}
+function regelnMitEntwurf(r){
+  const liste = DATEIEN.regeln.liste.slice();
+  if(typeof regelIndex === 'number') liste[regelIndex] = r; else liste.unshift(r);   // neue Regeln ganz nach oben
+  return liste;
+}
+function regelTrefferZeigen(){
+  const box = $('r-treffer'); box.textContent = '';
+  const r = regelEntwurf();
+  if(!r.match){ box.append(el('div','fehlzeile','Bitte ein Gewässer-Stichwort eintragen.')); return; }
+  const liste = regelnMitEntwurf(r), pos = typeof regelIndex === 'number' ? regelIndex : 0;
+  const greift = [], verdeckt = [];
+  lbvItems().forEach(i=>{
+    const passt = String(i.gewaesser).toLowerCase().includes(r.match) && String(i.bereich).toLowerCase().includes((r.bereich||'').toLowerCase());
+    if(!passt) return;
+    if(findeRegel(i, liste) === pos) greift.push(i); else verdeckt.push(i);
+  });
+  if(greift.length){
+    box.append(el('div','ok-zeile','Gilt für: ' + greift.map(i => `${i.gewaesser} (${i.bereich.slice(0,50)})`).join('; ')));
+  }else{
+    box.append(el('div','warnzeile','Passt auf keine der aktuellen LBV-Sperrungen. Das ist in Ordnung, wenn die Regel für später gedacht ist.'));
+  }
+  if(verdeckt.length) box.append(el('div','warnzeile','Würde passen, aber eine weiter oben stehende Regel greift zuerst: ' +
+    verdeckt.map(i => i.gewaesser).join('; ') + '. Regel in der Liste nach oben schieben.'));
+  if(regelLbv && !greift.includes(regelLbv))
+    box.append(el('div','fehlzeile',`Achtung: Greift NICHT für „${regelLbv.gewaesser}“, von der ihr gekommen seid. Stichwörter prüfen.`));
+}
+function regelUebernehmen(){
+  if(modus === 'linie' && entwurf.length > 1) linieFertig();
+  const r = regelEntwurf();
+  if(!r.match){ alert('Bitte ein Gewässer-Stichwort eintragen.'); return; }
+  if(!r.manual && !r.ways && !r.ways_regex && !r.near){
+    alert('Bitte die Stelle auf der Karte einzeichnen („Punkt setzen“ oder „Linie zeichnen“).'); return;
+  }
+  DATEIEN.regeln.liste = regelnMitEntwurf(r);
+  regelAbbrechen(); aktualisiere();
+}
+
+// ================================================================ Speichern
+const geaendert = () => Object.values(DATEIEN).filter(d => d.geladen && d.render(d.liste) !== d.text);
+function aktualisiere(){
+  renderEigeneListe(); renderLbvListe(); renderRegelListe();
+  if(regelIndex !== undefined) regelTrefferZeigen();
+  const dirty = geaendert().length > 0;
+  $('btn-save').disabled = !dirty;
+  $('save-info').className = dirty ? 'dirty' : '';
+  $('save-info').textContent = dirty ? 'Ungespeicherte Änderungen' : 'Alles gespeichert.';
+}
+function formOffen(){
+  return eigeneIndex !== null || $('e-gewaesser').value.trim() !== '' || regelIndex !== undefined;
+}
+async function speichern(){
+  if(!token()){
+    $('token-details').open = true; $('token-details').scrollIntoView({behavior:'smooth', block:'center'});
+    $('save-info').className = 'err'; $('save-info').textContent = 'Zuerst unten den Zugangsschlüssel eintragen.'; return;
+  }
+  if(formOffen() && !confirm('Im Formular stehen noch nicht übernommene Angaben – die werden NICHT mitgespeichert. Trotzdem speichern?')) return;
+  $('btn-save').disabled = true; $('save-info').className = ''; $('save-info').textContent = 'Speichere …';
+  try{
+    for(const d of geaendert()){
+      const text = d.render(d.liste);
+      if(!d.sha){ const f = await ladeDatei(d.pfad); d.sha = f.sha; }
+      const body = {message: d.nachricht, content: textZuB64(text), branch: BRANCH};
+      if(d.sha) body.sha = d.sha;
+      const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${d.pfad}`,
+        {method:'PUT', headers:{...apiHeaders(), 'Content-Type':'application/json'}, body: JSON.stringify(body)});
+      if(!res.ok){
+        if(res.status === 409 || res.status === 422) throw `${d.pfad} wurde zwischenzeitlich anderswo geändert. Bitte Seite neu laden.`;
+        if(res.status === 401) throw 'Der Zugangsschlüssel ist ungültig oder abgelaufen.';
+        if(res.status === 403 || res.status === 404) throw 'Der Zugangsschlüssel darf nicht in dieses Repository schreiben.';
+        throw 'Speichern fehlgeschlagen (HTTP ' + res.status + ').';
+      }
+      const js = await res.json(); d.sha = js.content.sha; d.text = text;
+    }
+    aktualisiere();
+    $('save-info').className = 'ok'; $('save-info').textContent = 'Gespeichert. Die Karte ist in wenigen Minuten aktuell.';
+  }catch(msg){
+    $('save-info').className = 'err'; $('save-info').textContent = typeof msg === 'string' ? msg : 'Keine Verbindung zu GitHub.';
+    $('btn-save').disabled = !geaendert().length;
+  }
+}
+async function tokenSpeichern(){
+  const t = $('f-token').value.trim();
+  if(!t){ $('token-status').textContent = 'Bitte den Schlüssel einfügen.'; return; }
+  $('token-status').style.color = ''; $('token-status').textContent = 'Prüfe …';
+  try{
+    const res = await fetch(`https://api.github.com/repos/${REPO}`, {headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer ' + t}});
+    if(res.status === 401) throw 'Schlüssel ungültig oder abgelaufen.';
+    if(!res.ok) throw 'Kein Zugriff auf ' + REPO + ' (HTTP ' + res.status + ').';
+    const js = await res.json();
+    if(js.permissions && js.permissions.push === false) throw 'Der Schlüssel darf nur lesen. Bitte „Contents: Read and write“ wählen.';
+    localStorage.setItem(TOKEN_KEY, t); $('f-token').value = ''; tokenAnzeige();
+    $('token-status').style.color = 'var(--ok)'; $('token-status').textContent = 'Eingerichtet.';
+  }catch(msg){
+    $('token-status').style.color = 'var(--err)'; $('token-status').textContent = typeof msg === 'string' ? msg : 'Keine Verbindung zu GitHub.';
+  }
+}
+function tokenEntfernen(){
+  try{ localStorage.removeItem(TOKEN_KEY); }catch(_){}
+  tokenAnzeige(); $('token-status').style.color = ''; $('token-status').textContent = 'Von diesem Gerät entfernt.';
+}
+function tokenAnzeige(){ $('token-summary').textContent = token() ? 'Speichern ist auf diesem Gerät eingerichtet' : 'Zugangsschlüssel eintragen'; }
+
+// ================================================================ Start
+window.addEventListener('beforeunload', e => { if(geaendert().length){ e.preventDefault(); e.returnValue = ''; } });
+$('repo-name-hilfe').textContent = REPO;
+tokenAnzeige();
+$('platz-eigene').append($('karten-block'));
+karteAnlegen(); mehrereFormen = false; setzeModus(null);
+laden();
+</script>
+</body>
+</html>
