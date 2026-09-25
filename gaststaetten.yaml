@@ -74,7 +74,6 @@ gaststaetten:
       freitag: "11:00-17:00"
       samstag: "11:00-17:00"
       sonntag: "Ruhetag"
-    hinweis: "Lehde, nur per Kahn oder zu Fuß erreichbar. Saisonal geöffnet (ca. Ostern bis Oktober), außerhalb der Saison geschlossen."
 
   - name: "Gasthaus Kaupen Nr. 6"
     osm_name: "Kaupen"
