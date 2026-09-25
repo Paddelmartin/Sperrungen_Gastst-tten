@@ -18,17 +18,6 @@
 # Offen: Conradsbrücke (Spree, Brücke 08/78, Burg, Schwarze Ecke 1) - Position fehlt noch.
 
 regeln:
-  - match: "spree / conrads brücke"
-    manual:
-      - point: [51.843477, 14.103374]
-        radius_m: 50
-
-  - match: "spree / mühle schlepzig"
-    notiz: "Schlepzig"
-    manual:
-      - point: [52.028965, 13.890011]
-        radius_m: 30
-
   - match: "zeitzfließ"
     bereich: "Zeitzschleuse"
     notiz: "Zeitzschleuse, Wehr 107"
@@ -131,6 +120,17 @@ regeln:
     genau: false
     ways: ["Erster Freiheitskanal", "I. Freiheitskanal"]
     ways_regex: "^(I|Erster|1)[^A-Za-z]*Freiheitskanal"
+
+  - match: "spree / mühle schlepzig"
+    notiz: "Schlepzig"
+    manual:
+      - point: [52.028965, 13.890011]
+        radius_m: 30
+
+  - match: "spree / conrads brücke"
+    manual:
+      - point: [51.843477, 14.103374]
+        radius_m: 50
 
   - match: "dresslerstrom"
     manual:
