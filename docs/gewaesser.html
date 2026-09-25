@@ -459,6 +459,7 @@ function formenZeichnen(){
     L.polyline(entwurf, {color:'#EC6D28', weight:4, dashArray:'6 6'}).addTo(formenLayer);
     entwurf.forEach(p => L.circleMarker(p, {radius:4, color:'#EC6D28', fillOpacity:1}).addTo(formenLayer));
   }
+  if(typeof regelIndex !== 'undefined' && regelIndex !== undefined) regelTrefferZeigen();
   const box = $('formen-liste'); box.textContent = '';
   formen.forEach((f,i)=>{
     const z = el('div','form-zeile');
@@ -608,6 +609,8 @@ function renderLbvListe(){
       left.append(el('div','meta','Gilt für das ganze Gebiet – wird nicht eingezeichnet.'));
     }else if(i.geom && i.geom.length){
       left.append(el('div','ok-zeile', '✓ Auf der Karte' + (ri >= 0 ? ' – ' + regelArt(regeln[ri]) : '')));
+      if(ri >= 0 && regeln[ri].manual && regeln[ri].manual.length && !regeln[ri].bereich)
+        left.append(el('div','warnzeile','⚠ Handzeichnung ohne Bereich-Stichwort – bitte ein Wort aus dem Bereich ergänzen.'));
     }else if(ri >= 0 && regeln[ri].manual && regeln[ri].manual.length){
       left.append(el('div','ok-zeile','✓ Von Hand eingezeichnet – erscheint nach dem Speichern auf der Karte.'));
     }else{
@@ -635,6 +638,7 @@ function renderRegelListe(){
     const left = el('div');
     left.append(el('b', null, `${i+1}. ${r.match}` + (r.bereich ? ` · Bereich „${r.bereich}“` : '')));
     left.append(el('div','meta', regelArt(r) + (r.notiz ? ' · ' + r.notiz : '')));
+    if(r.manual && r.manual.length && !r.bereich) left.append(el('div','warnzeile','⚠ Handzeichnung ohne Bereich-Stichwort – gilt fürs ganze Gewässer.'));
     const buttons = el('div','item-buttons');
     const b1 = el('button','btn-link','Bearbeiten'); b1.onclick = () => regelOeffnen(i, null);
     const hoch = el('button','btn-link','↑ nach oben'); hoch.disabled = i === 0;
@@ -715,6 +719,8 @@ function regelTrefferZeigen(){
   const box = $('r-treffer'); box.textContent = '';
   const r = regelEntwurf();
   if(!r.match){ box.append(el('div','fehlzeile','Bitte ein Gewässer-Stichwort eintragen.')); return; }
+  if(r.manual && !r.bereich) box.append(el('div','warnzeile','⚠ Handzeichnung ohne Bereich-Stichwort: gilt für JEDE Sperrung auf diesem Gewässer. ' +
+    'Sperrt die LBV später eine andere Stelle, würde sie hier eingezeichnet. Besser ein Wort aus dem Bereich eintragen.'));
   const liste = regelnMitEntwurf(r), pos = typeof regelIndex === 'number' ? regelIndex : 0;
   const greift = [], verdeckt = [];
   lbvItems().forEach(i=>{
@@ -739,6 +745,8 @@ function regelUebernehmen(){
   if(!r.manual && !r.ways && !r.ways_regex && !r.near){
     alert('Bitte die Stelle auf der Karte einzeichnen („Punkt setzen“ oder „Linie zeichnen“).'); return;
   }
+  if(r.manual && !r.bereich && !confirm('Diese Handzeichnung hat kein Bereich-Stichwort und gilt damit für JEDE Sperrung auf „' + r.match +
+    '“ – auch für spätere Sperrungen an einer anderen Stelle. Trotzdem so übernehmen?')) return;
   DATEIEN.regeln.liste = regelnMitEntwurf(r);
   regelAbbrechen(); aktualisiere();
 }
