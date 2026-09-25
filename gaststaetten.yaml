@@ -2,21 +2,34 @@
 # ========================
 # Hier tragt ihr die Gaststätten ein, die auf der Karte erscheinen sollen - nur die, die für
 # euch relevant sind, nicht automatisch alle aus der Umgebung. Für jede wird täglich geprüft,
-# ob sie heute laut OpenStreetMap geöffnet hat oder Ruhetag ist.
+# ob sie heute geöffnet hat oder Ruhetag ist.
 #
-# Diese Datei kann auch bequem über die Seite erfassen.html gepflegt werden.
+# Diese Datei wird am bequemsten über die Seite erfassen.html gepflegt (dort auch Speichern).
 #
-# WICHTIG:
-#   - Nicht jede Gaststätte hat bei OpenStreetMap hinterlegte Öffnungszeiten, und wo doch, sind
-#     sie nicht immer aktuell. Steht auf der Karte "Öffnungszeiten unbekannt", tragt sie hier
-#     unten von Hand nach.
-#   - Ein Eintrag mit einem Fehler wird übersprungen (mit Warnung im Ablauf-Protokoll bei GitHub
-#     Actions), der Rest der Karte funktioniert trotzdem weiter.
+# Felder je Gaststätte:
+#   name      Anzeigename auf der Karte
+#   osm_id    feste Verknüpfung mit einem OpenStreetMap-Objekt (z. B. "node/123456") - am genauesten
+#   osm_name  sonst: Suche bei OpenStreetMap nach diesem Namen
+#   punkt     sonst: Koordinate von Hand [Breite, Länge]
+#   zeiten    Öffnungszeiten von Hand je Wochentag, haben Vorrang vor OpenStreetMap
+#             ("11:00-20:00", geteilt "11:00-14:00, 17:00-22:00" oder "Ruhetag")
+#   hinweis   freier Zusatztext
+#
+# Ein Eintrag mit einem Fehler wird übersprungen (Warnung im Ablauf-Protokoll bei GitHub Actions),
+# der Rest der Karte funktioniert trotzdem weiter.
 
 gaststaetten:
   - name: "Gasthaus zum Froschkönig"
     osm_name: "Froschkönig"
-    hinweis: "Leipe. Genaue Öffnungszeiten bitte direkt erfragen (Tel. 03542 403940) und hier ergänzen."
+    zeiten:
+      montag: "Ruhetag"
+      dienstag: "Ruhetag"
+      mittwoch: "11:00-17:00"
+      donnerstag: "11:00-17:00"
+      freitag: "11:00-17:00"
+      samstag: "11:00-17:00"
+      sonntag: "11:00-17:00"
+    hinweis: "April-Oktober"
 
   - name: "Gasthaus Wotschofska"
     osm_name: "Wotschofska"
@@ -53,3 +66,4 @@ gaststaetten:
       samstag: "12:00-21:00"
       sonntag: "12:00-21:00"
     hinweis: "Lehde, nur per Kahn oder Fußweg erreichbar. Saisonal geöffnet (ca. ab Mitte April), außerhalb der Saison geschlossen."
+
