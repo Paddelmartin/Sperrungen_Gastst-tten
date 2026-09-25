@@ -637,7 +637,10 @@ def load_restaurants(path, day, geo, osm_info=None):
             osm_name = e.get("osm_name")
             osm_id = e.get("osm_id")
             osm_tags, treffer = {}, None
-            if osm_id:
+            hat_zeiten = isinstance(e.get("zeiten"), dict) and bool(e.get("zeiten"))
+            if punkt and hat_zeiten:
+                pass                                         # alles von Hand da -> OSM gar nicht erst fragen
+            elif osm_id:
                 treffer = geo.poi_by_id(osm_id)
             elif osm_name:
                 treffer = geo.poi(osm_name)
@@ -645,7 +648,10 @@ def load_restaurants(path, day, geo, osm_info=None):
                 if not punkt:
                     punkt = [treffer["lat"], treffer["lon"]]
                 osm_tags = treffer["tags"]
-            if osm_info is not None:                          # für erfassen.html: was OSM zu diesem Eintrag weiß
+            if osm_info is not None and punkt and hat_zeiten:
+                osm_info[name] = {"gefunden": False, "abfrage": "nicht_noetig", "punkt": None, "osm": "",
+                                  "osm_name": "", "opening_hours": "", "woche": {}, "unsicher": False}
+            elif osm_info is not None:                        # für erfassen.html: was OSM zu diesem Eintrag weiß
                 oh = osm_tags.get("opening_hours", "")
                 woche, unsicher_w = osm_week_as_zeiten(oh)
                 osm_info[name] = {"gefunden": bool(treffer), "abfrage": geo.letzter_status,
