@@ -20,7 +20,7 @@
 
 gaststaetten:
   - name: "Gasthaus zum Froschkönig"
-    osm_name: "Froschkönig"
+    osm_name: "Gasthaus Froschkönig"
     zeiten:
       montag: "Ruhetag"
       dienstag: "Ruhetag"
