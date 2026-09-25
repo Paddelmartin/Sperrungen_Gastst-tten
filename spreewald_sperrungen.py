@@ -198,16 +198,23 @@ class Geo:
         return out[:3]
 
     def poi(self, name_pattern):
-        """Sucht eine Gaststätte (oder Café/Bar) nach Namen, liefert Position + OSM-Tags (u.a. opening_hours)."""
-        ql = (f'[out:json][timeout:60];'
-              f'nwr["name"~"{name_pattern}"]["amenity"~"^(restaurant|cafe|bar|pub|fast_food|biergarten)$"]'
-              f'({BBOX});out center tags;')
+        """Sucht eine Gaststätte nach Namen (Groß-/Kleinschreibung egal), liefert Position + OSM-Tags.
+        Auch Hotels/Pensionen werden gefunden (viele Gasthöfe sind bei OSM so eingetragen); ein Eintrag
+        als Restaurant/Café hat aber Vorrang."""
+        pat = str(name_pattern).replace("\\", "\\\\").replace('"', '\\"')
+        ql = (f'[out:json][timeout:60];('
+              f'nwr["name"~"{pat}",i]["amenity"~"^(restaurant|cafe|bar|pub|fast_food|biergarten)$"]({BBOX});'
+              f'nwr["name"~"{pat}",i]["tourism"~"^(hotel|guest_house|chalet|hostel)$"]({BBOX});'
+              f');out center tags;')
+        treffer = []
         for el in self.query(ql):
             c = el if "lat" in el else el.get("center")
             if c:
-                return {"lat": c["lat"], "lon": c["lon"], "tags": el.get("tags", {}),
-                        "osm": f"{el.get('type')}/{el.get('id')}"}
-        return None
+                treffer.append({"lat": c["lat"], "lon": c["lon"], "tags": el.get("tags", {}),
+                                "osm": f"{el.get('type')}/{el.get('id')}"})
+        treffer.sort(key=lambda t: (0 if "amenity" in t["tags"] else 1,
+                                    0 if t["tags"].get("opening_hours") else 1))
+        return treffer[0] if treffer else None
 
     def poi_by_id(self, osm_id):
         """Genau ein OSM-Objekt ('node/123', 'way/456', 'relation/789') - eindeutiger als die Namenssuche."""
@@ -685,7 +692,10 @@ def main():
     render(items, gaststaetten, day, stand, a.out)
     write_restaurant_osm_data(osm_info, geo, Path(a.out).with_name("gaststaetten_osm.json"))
     for g in gaststaetten:
-        print(f"Gaststätte      {g['status']:15} {g['name']}")
+        print(f"Gaststätte      {g['status']:15} auf Karte  {g['name']}")
+    for name, info in osm_info.items():
+        if not info["gefunden"] and name not in {g["name"] for g in gaststaetten}:
+            print(f"Gaststätte      FEHLT (bei OpenStreetMap nicht gefunden, Koordinaten nachtragen): {name}")
     for i in items:
         marker = " (eigen)" if i.get("quelle") == "eigen" else ""
         print(f"{i['status']:15} {'auf Karte ' if i['geom'] else 'OHNE Geo  '} {i['gewaesser']}{marker} | {i['bereich'][:60]}")
