@@ -107,7 +107,7 @@ regeln:
     notiz: "Jedroschleuse, Wehr 27 (Abschnitt bis Kreisgrenze)"
     manual:
       - point: [51.839613, 14.096054]
-        radius_m: 300
+        radius_m: 50
 
   - match: "spree"
     bereich: "Hartmannsdorf"
