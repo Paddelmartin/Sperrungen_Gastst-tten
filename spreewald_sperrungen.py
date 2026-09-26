@@ -332,9 +332,22 @@ def build_geometry(rule, geo):
     return []
 
 
-def find_rule(rules, row):
+KATEGORIEN = ("gesperrt", "eingeschraenkt")
+
+
+def hat_geometrie(rule):
+    return bool(rule.get("manual") or rule.get("ways") or rule.get("ways_regex") or rule.get("near"))
+
+
+def find_rule(rules, row, art=None):
+    """Erste passende Regel. art="geom": nur Regeln mit Kartenposition; art="status": nur Regeln, die die
+    Kategorie (gesperrt/eingeschränkt) festlegen. So kann eine reine Kategorie-Regel keine Position verdecken."""
     g, b = row["gewaesser"].lower(), row["bereich"].lower()
     for rule in rules:
+        if art == "geom" and not hat_geometrie(rule):
+            continue
+        if art == "status" and rule.get("status") not in KATEGORIEN:
+            continue
         if rule["match"].lower() in g and rule.get("bereich", "").lower() in b:
             return rule
     return None
@@ -388,18 +401,27 @@ def position_hint(t, rules, old=None):
     row = dict(zip(KEYS, t))
     if row["gewaesser"].lower().startswith("oberspreewald"):
         return "Gebietshinweis (keine Kartenposition nötig)"
-    rule = find_rule(rules, row)
+    rule = find_rule(rules, row, "geom")
     if old is not None:
-        alt = find_rule(rules, dict(zip(KEYS, old)))
+        alt = find_rule(rules, dict(zip(KEYS, old)), "geom")
         if alt is not None and alt is not rule and alt.get("manual"):
             return f"ACHTUNG: passt nicht mehr zu eurer Handzeichnung (Wortlaut geändert) {PRUEFEN}"
-    if not rule or not (rule.get("manual") or rule.get("ways") or rule.get("ways_regex") or rule.get("near")):
+    if not rule:
         return "ACHTUNG: KEINE Position hinterlegt -> auf gewaesser.html einzeichnen"
     if rule.get("manual"):
         if not rule.get("bereich"):
             return f"von Hand eingezeichnet, Regel OHNE Bereich-Stichwort (gilt fürs ganze Gewässer) {PRUEFEN}"
         return f"von Hand eingezeichnet (Bereich „{rule['bereich']}“) {PRUEFEN}"
     return "Position hinterlegt (automatisch aus OpenStreetMap)"
+
+
+def kategorie_hint(t, rules):
+    row = dict(zip(KEYS, t))
+    srule = find_rule(rules, row, "status")
+    if not srule:
+        return []
+    name = "eingeschränkt" if srule["status"] == "eingeschraenkt" else "gesperrt"
+    return [f"  Kategorie: von euch auf „{name}“ gesetzt – passt das noch zum LBV-Text? {PRUEFEN}"]
 
 
 def build_message(added, changed, removed, stand, rules):
@@ -419,7 +441,7 @@ def build_message(added, changed, removed, stand, rules):
             r = dict(zip(KEYS, t))
             L += [f"* {r['gewaesser']}", f"  Bereich:  {r['bereich']}", f"  Zeitraum: {r['zeitraum']}",
                   f"  Grund:    {r['grund']}", f"  Hinweis:  {r['hinweis']}",
-                  f"  Karte:    {position_hint(t, rules)}", ""]
+                  f"  Karte:    {position_hint(t, rules)}"] + kategorie_hint(t, rules) + [""]
     if changed:
         L += [f"GEÄNDERT ({len(changed)})", ""]
         for old, new in changed:
@@ -428,7 +450,7 @@ def build_message(added, changed, removed, stand, rules):
             for i, k in enumerate(KEYS):
                 if k in LABELS and old[i] != new[i]:
                     L += [f"  {LABELS[k]} vorher:  {old[i]}", f"  {LABELS[k]} jetzt:   {new[i]}"]
-            L += [f"  Karte:    {position_hint(new, rules, old)}", ""]
+            L += [f"  Karte:    {position_hint(new, rules, old)}"] + kategorie_hint(new, rules) + [""]
     if removed:
         L += [f"ENTFERNT / nicht mehr aufgeführt ({len(removed)})", ""]
         for t in removed:
@@ -753,8 +775,12 @@ def main():
             continue
         row["status"] = st
         row["geom"], row["genau"] = [], True
-        rule = find_rule(rules, row)
+        rule = find_rule(rules, row, "geom")
         row["regel"] = next((n for n, r in enumerate(rules) if r is rule), None)   # für gewaesser.html
+        srule = find_rule(rules, row, "status")          # von euch angepasste Kategorie
+        if srule and st in KATEGORIEN and srule["status"] != st:
+            row["status_lbv"] = st                        # auf der Karte als "angepasst" gekennzeichnet
+            st = row["status"] = srule["status"]
         if rule and st != "gebiet":
             row["geom"] = build_geometry(rule, geo)
             row["genau"] = rule.get("genau", True)

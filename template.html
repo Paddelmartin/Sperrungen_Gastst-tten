@@ -92,6 +92,7 @@ function el(tag, cls, text){const e=document.createElement(tag); if(cls)e.classN
 function popup(it){
   const d=el('div'); const b=el('b',null,it.gewaesser); d.append(b, el('div',null,LAB[it.status]+' – '+it.bereich));
   if(it.quelle==='eigen') d.append(el('div','owntag','Eigener Hinweis – nicht von der LBV'));
+  if(it.status_lbv) d.append(el('div','owntag','Kategorie von uns angepasst – LBV meldet: '+LAB[it.status_lbv]));
   d.append(el('div','mut','Zeitraum: '+it.zeitraum));
   if(it.grund) d.append(el('div','mut','Grund: '+it.grund));
   d.append(el('div',null,it.hinweis));
@@ -163,6 +164,7 @@ items.forEach(it=>{
   const head=el('b'); const bd=el('span','badge',LAB[it.status]); bd.style.background=color||'#777';
   head.append(bd, it.gewaesser); row.append(head, el('div','mut',it.bereich), el('div','mut','Zeitraum: '+it.zeitraum));
   if(it.quelle==='eigen') row.append(el('div','owntag','Eigener Hinweis – nicht von der LBV'));
+  if(it.status_lbv) row.append(el('div','owntag','Kategorie von uns angepasst – LBV meldet: '+LAB[it.status_lbv]));
   if(it.grund) row.append(el('div','mut','Grund: '+it.grund));
   if(it.hinweis) row.append(el('div',null,it.hinweis));
   if(color && !layers.length){ row.append(el('div','warn','⚠ Nicht auf der Karte verortet – bitte Text beachten!')); }
