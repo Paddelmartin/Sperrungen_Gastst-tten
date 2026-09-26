@@ -94,7 +94,7 @@
 
   <div class="tabs">
     <button id="tab-eigene" class="aktiv" onclick="zeigeTab('eigene')">Eigene Sperrungen</button>
-    <button id="tab-regeln" onclick="zeigeTab('regeln')">Kartenpositionen der LBV-Sperrungen</button>
+    <button id="tab-regeln" onclick="zeigeTab('regeln')">LBV-Sperrungen: Position & Kategorie</button>
   </div>
 
   <div id="status">Lade aktuelle Daten …</div>
@@ -156,13 +156,21 @@
         <input type="text" id="r-bereich" oninput="regelTrefferZeigen()">
         <div class="hint">Ein Wort aus dem Feld „Bereich“, z. B. „Wehrkanal“. Dann gilt die Position nur für diese Stelle.
           Leer lassen = gilt für jede Sperrung auf diesem Gewässer.</div>
+        <label for="r-status">Kategorie auf der Karte</label>
+        <select id="r-status" onchange="regelTrefferZeigen()" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:13.5px;background:#fff">
+          <option value="">Wie von der LBV gemeldet</option>
+          <option value="gesperrt">Gesperrt</option>
+          <option value="eingeschraenkt">Eingeschränkt</option>
+        </select>
+        <div class="hint">Nur ändern, wenn die LBV-Einstufung nicht zur Lage vor Ort passt. Auf der Karte steht dann dazu
+          „Kategorie von uns angepasst – LBV meldet: …“.</div>
         <div id="r-treffer" class="trefferbox"></div>
         <label for="r-notiz">Notiz (nur für euch)</label>
         <input type="text" id="r-notiz" placeholder="z. B. Schleuse Kannomühle, Wehr 52">
         <label class="check" style="margin-top:12px"><input type="checkbox" id="r-ungefaehr"> Nur ungefähr eingezeichnet
           (Hinweis im Popup)</label>
         <div id="r-osm" class="osmbox" style="display:none"></div>
-        <label>Von Hand einzeichnen</label>
+        <label>Von Hand einzeichnen (optional, wenn nur die Kategorie geändert werden soll)</label>
         <div id="platz-regeln"></div>
         <div class="form-buttons">
           <button class="btn-primary" id="r-btn" onclick="regelUebernehmen()">Übernehmen</button>
@@ -309,7 +317,9 @@ const HEADER_REGELN = `# Kartenpositionen der LBV-Sperrungen
 regeln:
 `;
 const EIGENE_FELDER = ['gewaesser','bereich','von','bis','status','grund','hinweis','punkt','radius_m','linie'];
-const REGEL_FELDER = ['match','bereich','genau','notiz','manual','ways','ways_regex','near','radius_m'];
+const REGEL_FELDER = ['match','bereich','genau','status','notiz','manual','ways','ways_regex','near','radius_m'];
+const KAT_TEXT = {gesperrt:'gesperrt', eingeschraenkt:'eingeschränkt'};
+const hatGeometrie = r => !!((r.manual && r.manual.length) || r.ways || r.ways_regex || r.near);
 
 function extraFelder(e, bekannt){
   return Object.keys(e).filter(k => !bekannt.includes(k)).map(k =>
@@ -338,6 +348,7 @@ function renderRegeln(liste){
     out += `  - match: ${q(r.match)}\n`;
     if(r.bereich) out += `    bereich: ${q(r.bereich)}\n`;
     if(r.genau === false) out += `    genau: false\n`;
+    if(r.status) out += `    status: ${q(r.status)}\n`;
     if(r.notiz) out += `    notiz: ${q(r.notiz)}\n`;
     if(r.manual && r.manual.length){
       out += `    manual:\n`;
@@ -577,12 +588,19 @@ function eigeneUebernehmen(){
 let regelIndex = undefined;   // undefined = Formular zu, null = neue Regel, Zahl = bestehende Regel
 let regelLbv = null;          // LBV-Eintrag, von dem aus das Formular geöffnet wurde
 
-function findeRegel(item, regeln){
+function findeRegel(item, regeln, art){
   const g = String(item.gewaesser||'').toLowerCase(), b = String(item.bereich||'').toLowerCase();
-  return regeln.findIndex(r => g.includes(String(r.match||'').toLowerCase()) && b.includes(String(r.bereich||'').toLowerCase()));
+  return regeln.findIndex(r => (art !== 'geom' || hatGeometrie(r)) && (art !== 'status' || KAT_TEXT[r.status])
+    && g.includes(String(r.match||'').toLowerCase()) && b.includes(String(r.bereich||'').toLowerCase()));
 }
+function lbvStatus(i){ return i.status_lbv || i.status; }   // Einstufung der LBV (vor eurer Anpassung)
 function regelArt(r){
+  const kat = KAT_TEXT[r.status] ? ` · Kategorie „${KAT_TEXT[r.status]}“` : '';
+  return regelArtPos(r) + kat;
+}
+function regelArtPos(r){
   if(r.manual && r.manual.length) return 'von Hand eingezeichnet';
+  if(KAT_TEXT[r.status] && !hatGeometrie(r)) return 'nur Kategorie';
   if(r.ways || r.ways_regex) return 'automatisch aus OpenStreetMap';
   if(r.near) return 'automatisch (Ort aus OpenStreetMap)';
   return 'ohne Position';
@@ -600,11 +618,15 @@ function renderLbvListe(){
     const item = el('div','list-item');
     const left = el('div');
     const titel = el('b');
-    const st = i.status || '';
+    const lbv = lbvStatus(i) || '';
+    const si = findeRegel(i, regeln, 'status');
+    const st = (si >= 0 && KAT_TEXT[lbv]) ? regeln[si].status : lbv;
     titel.append(el('span','badge b-' + st, st === 'eingeschraenkt' ? 'eingeschränkt' : st === 'bald' ? 'demnächst' : st),
                  document.createTextNode(i.gewaesser));
     left.append(titel, el('div','meta', i.bereich));
-    const ri = findeRegel(i, regeln);
+    if(st !== lbv) left.append(el('div','warnzeile', `Kategorie von euch angepasst – LBV meldet „${KAT_TEXT[lbv] || lbv}“.`));
+    else if(si >= 0 && KAT_TEXT[lbv]) left.append(el('div','meta', `Kategorie von euch festgelegt (gleich wie LBV: ${KAT_TEXT[lbv]}).`));
+    const ri = findeRegel(i, regeln, 'geom');
     if(st === 'gebiet'){
       left.append(el('div','meta','Gilt für das ganze Gebiet – wird nicht eingezeichnet.'));
     }else if(i.geom && i.geom.length){
@@ -616,13 +638,13 @@ function renderLbvListe(){
     }else{
       left.append(el('div','fehlzeile', ri >= 0
         ? `✗ Nicht auf der Karte – Regel „${regeln[ri].match}“ (${regelArt(regeln[ri])}) hat nichts gefunden.`
-        : '✗ Nicht auf der Karte – es gibt noch keine Regel dafür.'));
+        : '✗ Nicht auf der Karte – es gibt noch keine Position dafür.'));
     }
     item.append(left);
     if(st !== 'gebiet'){
       const buttons = el('div','item-buttons');
-      const b = el('button','btn-link', ri >= 0 ? 'Position bearbeiten' : 'Position einzeichnen');
-      b.onclick = () => regelOeffnen(ri >= 0 ? ri : null, i);
+      const b = el('button','btn-link', ri >= 0 || si >= 0 ? 'Bearbeiten' : 'Position / Kategorie');
+      b.onclick = () => regelOeffnen(ri >= 0 ? ri : si >= 0 ? si : null, i);
       buttons.append(b); item.append(buttons);
     }
     box.append(item);
@@ -638,7 +660,8 @@ function renderRegelListe(){
     const left = el('div');
     left.append(el('b', null, `${i+1}. ${r.match}` + (r.bereich ? ` · Bereich „${r.bereich}“` : '')));
     left.append(el('div','meta', regelArt(r) + (r.notiz ? ' · ' + r.notiz : '')));
-    if(r.manual && r.manual.length && !r.bereich) left.append(el('div','warnzeile','⚠ Handzeichnung ohne Bereich-Stichwort – gilt fürs ganze Gewässer.'));
+    if(((r.manual && r.manual.length) || KAT_TEXT[r.status]) && !r.bereich)
+      left.append(el('div','warnzeile','⚠ Ohne Bereich-Stichwort – gilt für jede Sperrung auf diesem Gewässer.'));
     const buttons = el('div','item-buttons');
     const b1 = el('button','btn-link','Bearbeiten'); b1.onclick = () => regelOeffnen(i, null);
     const hoch = el('button','btn-link','↑ nach oben'); hoch.disabled = i === 0;
@@ -672,6 +695,7 @@ function regelOeffnen(index, lbvItem){
   $('r-bereich').value = r ? (r.bereich || '') : '';
   $('r-notiz').value = r ? (r.notiz || '') : '';
   $('r-ungefaehr').checked = r ? r.genau === false : false;
+  $('r-status').value = r && KAT_TEXT[r.status] ? r.status : '';
   // OSM-Teil der Regel anzeigen (bleibt erhalten; eine Handzeichnung hat Vorrang)
   const osm = $('r-osm'); osm.textContent = '';
   if(r && (r.ways || r.ways_regex || r.near)){
@@ -686,7 +710,7 @@ function regelOeffnen(index, lbvItem){
   const vorhandene = r && r.manual ? r.manual.map(m => m.point ? {t:'punkt', c:m.point, r:m.radius_m || 200} : {t:'linie', c:m.line}) : [];
   formenSetzen(vorhandene);
   if(!vorhandene.length && lbvItem && lbvItem.geom) zeigeGeometrie(lbvItem.geom);
-  $('regel-titel').textContent = index !== null ? `Regel „${r.match}“ bearbeiten` : 'Neue Kartenposition';
+  $('regel-titel').textContent = index !== null ? `Regel „${r.match}“ bearbeiten` : 'Position / Kategorie festlegen';
   $('r-btn').textContent = index !== null ? 'Änderungen übernehmen' : 'Regel anlegen';
   $('regel-form').classList.add('editing');
   regelTrefferZeigen(); renderRegelListe();
@@ -702,10 +726,11 @@ function regelAbbrechen(){
 }
 function regelEntwurf(){
   const basis = typeof regelIndex === 'number' ? {...DATEIEN.regeln.liste[regelIndex]} : {};
-  ['match','bereich','genau','notiz','manual'].forEach(f => delete basis[f]);
+  ['match','bereich','genau','status','notiz','manual'].forEach(f => delete basis[f]);
   const r = {match: $('r-match').value.trim().toLowerCase()};
   const bereich = $('r-bereich').value.trim(); if(bereich) r.bereich = bereich;
   if($('r-ungefaehr').checked) r.genau = false;
+  if($('r-status').value) r.status = $('r-status').value;
   const notiz = $('r-notiz').value.trim(); if(notiz) r.notiz = notiz;
   if(formen.length) r.manual = formen.map(f => f.t === 'punkt' ? {point: f.c, radius_m: f.r} : {line: f.c});
   return Object.assign(r, basis);
@@ -719,14 +744,17 @@ function regelTrefferZeigen(){
   const box = $('r-treffer'); box.textContent = '';
   const r = regelEntwurf();
   if(!r.match){ box.append(el('div','fehlzeile','Bitte ein Gewässer-Stichwort eintragen.')); return; }
-  if(r.manual && !r.bereich) box.append(el('div','warnzeile','⚠ Handzeichnung ohne Bereich-Stichwort: gilt für JEDE Sperrung auf diesem Gewässer. ' +
-    'Sperrt die LBV später eine andere Stelle, würde sie hier eingezeichnet. Besser ein Wort aus dem Bereich eintragen.'));
+  if((r.manual || r.status) && !r.bereich) box.append(el('div','warnzeile','⚠ Ohne Bereich-Stichwort gilt diese Regel für JEDE Sperrung auf diesem Gewässer. ' +
+    'Sperrt die LBV später eine andere Stelle, würde ' + (r.manual ? 'sie hier eingezeichnet' : 'auch dort eure Kategorie gelten') +
+    '. Besser ein Wort aus dem Bereich eintragen.'));
   const liste = regelnMitEntwurf(r), pos = typeof regelIndex === 'number' ? regelIndex : 0;
   const greift = [], verdeckt = [];
   lbvItems().forEach(i=>{
     const passt = String(i.gewaesser).toLowerCase().includes(r.match) && String(i.bereich).toLowerCase().includes((r.bereich||'').toLowerCase());
     if(!passt) return;
-    if(findeRegel(i, liste) === pos) greift.push(i); else verdeckt.push(i);
+    const wirkt = (!hatGeometrie(r) && !r.status) ? findeRegel(i, liste) === pos
+      : (hatGeometrie(r) && findeRegel(i, liste, 'geom') === pos) || (r.status && findeRegel(i, liste, 'status') === pos);
+    if(wirkt) greift.push(i); else verdeckt.push(i);
   });
   if(greift.length){
     box.append(el('div','ok-zeile','Gilt für: ' + greift.map(i => `${i.gewaesser} (${i.bereich.slice(0,50)})`).join('; ')));
@@ -742,10 +770,10 @@ function regelUebernehmen(){
   if(modus === 'linie' && entwurf.length > 1) linieFertig();
   const r = regelEntwurf();
   if(!r.match){ alert('Bitte ein Gewässer-Stichwort eintragen.'); return; }
-  if(!r.manual && !r.ways && !r.ways_regex && !r.near){
-    alert('Bitte die Stelle auf der Karte einzeichnen („Punkt setzen“ oder „Linie zeichnen“).'); return;
+  if(!hatGeometrie(r) && !r.status){
+    alert('Bitte die Stelle auf der Karte einzeichnen oder eine Kategorie wählen.'); return;
   }
-  if(r.manual && !r.bereich && !confirm('Diese Handzeichnung hat kein Bereich-Stichwort und gilt damit für JEDE Sperrung auf „' + r.match +
+  if((r.manual || r.status) && !r.bereich && !confirm('Diese Regel hat kein Bereich-Stichwort und gilt damit für JEDE Sperrung auf „' + r.match +
     '“ – auch für spätere Sperrungen an einer anderen Stelle. Trotzdem so übernehmen?')) return;
   DATEIEN.regeln.liste = regelnMitEntwurf(r);
   regelAbbrechen(); aktualisiere();
