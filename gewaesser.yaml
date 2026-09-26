@@ -20,6 +20,7 @@
 regeln:
   - match: "spree"
     bereich: "Conradsbrücke"
+    status: "eingeschraenkt"
     manual:
       - point: [51.843472, 14.103381]
         radius_m: 50
