@@ -19,6 +19,12 @@
 
 regeln:
   - match: "obere boblitzer kahnfahrt"
+    bereich: "Obere Boblitzer Kahnfahrt, zwischen Südumfluter und Bahntrasse)"
+    status: "eingeschraenkt"
+    manual:
+      - line: [[51.849085, 13.998985], [51.848489, 13.999007], [51.847826, 13.999393], [51.847322, 13.999071], [51.846765, 13.998642], [51.846354, 13.998191], [51.845586, 13.998299], [51.84505, 13.997912], [51.844712, 13.997279], [51.844493, 13.99685], [51.844095, 13.996464], [51.843479, 13.995595]]
+
+  - match: "obere boblitzer kahnfahrt"
     bereich: "Obere Boblitzer Kahnfahrt bis Bahntrasse"
     status: "eingeschraenkt"
     manual:
