@@ -18,6 +18,12 @@
 # Offen: Conradsbrücke (Spree, Brücke 08/78, Burg, Schwarze Ecke 1) - Position fehlt noch.
 
 regeln:
+  - match: "obere boblitzer kahnfahrt"
+    bereich: "Obere Boblitzer Kahnfahrt bis Bahntrasse"
+    status: "eingeschraenkt"
+    manual:
+      - line: [[51.84908, 13.998975], [51.84853, 13.999017], [51.847993, 13.999307], [51.847562, 13.999168], [51.846866, 13.998599], [51.846416, 13.998234], [51.845866, 13.998256], [51.845382, 13.998234], [51.844957, 13.997848], [51.844739, 13.997397], [51.84458, 13.997], [51.844215, 13.996571], [51.843871, 13.996153], [51.843493, 13.995595]]
+
   - match: "spree"
     bereich: "Conradsbrücke"
     status: "eingeschraenkt"
