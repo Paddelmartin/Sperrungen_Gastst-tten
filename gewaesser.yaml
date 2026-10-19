@@ -19,6 +19,11 @@
 
 regeln:
   - match: "obere boblitzer kahnfahrt"
+    bereich: "Oberspreewald, zwischen Südumfluter und Bahntrasse Cottbus-Lübbenau"
+    manual:
+      - line: [[51.849099, 13.999028], [51.847999, 13.999264], [51.847415, 13.999135], [51.846461, 13.998299], [51.84552, 13.998234], [51.845029, 13.997998], [51.844698, 13.997183], [51.844406, 13.996797], [51.843757, 13.996089], [51.843492, 13.995638]]
+
+  - match: "obere boblitzer kahnfahrt"
     bereich: "Obere Boblitzer Kahnfahrt, zwischen Südumfluter und Bahntrasse)"
     status: "eingeschraenkt"
     manual:
