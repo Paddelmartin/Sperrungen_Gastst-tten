@@ -544,6 +544,42 @@ def plausibilitaet(rows, state_file, warn_file):
         warn_file.write_text(text, encoding="utf-8")
 
 
+OHNE_POS_STATE = HERE / "state" / "ohne_position.json"
+
+
+def ohne_position(items, state_file, warn_file):
+    """Meldet (einmalig pro Sperrung) LBV-Sperrungen, zu denen es in gewaesser.yaml keine Regel mit Kartenposition
+    gibt - sie stehen sonst nur in der Liste und fehlen auf der Karte. Die Meldung wird an warnung.txt angehängt
+    (geht an den Admin-Kanal). Gebietshinweise ("Oberspreewald ...") brauchen keine Position und zählen nicht."""
+    aktuell = {}
+    for i in items:
+        if i.get("quelle") != "lbv" or i.get("status") == "gebiet" or i.get("regel") is not None:
+            continue
+        if i["gewaesser"].lower().startswith("oberspreewald"):
+            continue
+        aktuell[f"{norm(i['gewaesser'])} | {norm(i['bereich'])}"] = i
+    try:
+        bekannt = set(json.loads(state_file.read_text(encoding="utf-8")))
+    except Exception:
+        bekannt = set()
+    neu = [k for k in aktuell if k not in bekannt]
+    # nur noch aktuelle Einträge merken: verschwindet eine Sperrung und kommt später wieder, wird sie erneut gemeldet
+    rest = sorted((set(aktuell) & bekannt) | set(neu))
+    try:
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        state_file.write_text(json.dumps(rest, ensure_ascii=False, indent=1), encoding="utf-8")
+    except OSError:
+        pass
+    if not neu:
+        return
+    zeilen = "\n".join(f"- {k[:120]}" for k in neu[:8]) + (f"\n... und {len(neu) - 8} weitere" if len(neu) > 8 else "")
+    text = (f"Neue LBV-Sperrung ohne Kartenposition ({len(neu)}):\n{zeilen}\n"
+            f"Sie steht nur in der Liste, nicht auf der Karte. Bitte auf gewaesser.html zuordnen/einzeichnen.")
+    print("::warning::" + text.replace("\n", " "), file=sys.stderr)
+    alt = warn_file.read_text(encoding="utf-8") if warn_file.exists() else ""
+    warn_file.write_text((alt + "\n\n" if alt else "") + text, encoding="utf-8")
+
+
 def load_own_notices(path, day, lookahead):
     """Liest eigene, von Mitarbeitern gepflegte Hinweise (eigene-sperrungen.yaml).
     Fehlerhafte einzelne Einträge werden übersprungen (mit Warnung), statt den ganzen Lauf abzubrechen."""
@@ -857,7 +893,10 @@ def main():
     print(f"\n{len(items)} Einträge für {day} -> {a.out}")
 
     if a.notify:
-        plausibilitaet(rows, Path(a.state_file), HERE / "warnung.txt")
+        warn = HERE / "warnung.txt"
+        warn.unlink(missing_ok=True)
+        plausibilitaet(rows, Path(a.state_file), warn)
+        ohne_position(items, OHNE_POS_STATE, warn)
         notify_changes(rows, stand, rules, Path(a.state_file))
     if a.test_push:
         subj = "Spreewald-Sperrkarte: Testnachricht"
