@@ -80,6 +80,17 @@
   #token-status{font-size:12.5px;margin-top:8px}
   a{color:var(--brand-orange-dark)}
   code{font-size:12px}
+
+  /* Kopf-Navigation */
+  .topnav{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 16px}
+  .topnav a{display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-size:13.5px;font-weight:600;
+    padding:9px 16px;border-radius:999px;border:1px solid #d6dde6;background:#fff;color:var(--brand-blue-dark);
+    box-shadow:0 1px 2px rgba(15,60,100,.06);transition:background .15s,border-color .15s,transform .05s}
+  .topnav a:hover{background:#eef4fa;border-color:var(--brand-blue)}
+  .topnav a:active{transform:translateY(1px)}
+  .topnav a.karte{background:var(--brand-orange);border-color:var(--brand-orange);color:#fff}
+  .topnav a.karte:hover{background:var(--brand-orange-dark);border-color:var(--brand-orange-dark)}
+  .topnav a.aktiv{background:var(--brand-blue);border-color:var(--brand-blue);color:#fff;cursor:default;box-shadow:none}
 </style>
 </head>
 <body>
@@ -88,7 +99,7 @@
     <img src="logo.png" alt="Bootsverleih Richter">
     <h1>Gewässer pflegen</h1>
   </header>
-  <div class="nav"><a href="index.html">Zur Sperrkarte</a><a href="erfassen.html">Gaststätten pflegen</a></div>
+  <nav class="topnav"><a class="karte" href="index.html">← Zur Sperrkarte</a><a href="erfassen.html">Gaststätten pflegen</a><a href="gewaesser.html" class="aktiv" aria-current="page">Gewässer pflegen</a></nav>
   <div class="sub">Änderungen werden erst mit „Bei GitHub speichern“ übernommen; die Karte baut sich danach in
     wenigen Minuten neu.</div>
 
