@@ -13,6 +13,8 @@
 #   punkt     sonst: Koordinate von Hand [Breite, Länge]
 #   zeiten    Öffnungszeiten von Hand je Wochentag, haben Vorrang vor OpenStreetMap
 #             ("11:00-20:00", geteilt "11:00-14:00, 17:00-22:00" oder "Ruhetag")
+#   saison    nur saisonal geöffnet: von/bis als Monatszahl 1-12, einschließlich (z. B. von: 4, bis: 10).
+#             Außerhalb der Saison zeigt die Karte "Saisonpause" statt "geöffnet"
 #   hinweis   freier Zusatztext
 #
 # Ein Eintrag mit einem Fehler wird übersprungen (Warnung im Ablauf-Protokoll bei GitHub Actions),
@@ -30,7 +32,9 @@ gaststaetten:
       freitag: "11:00-17:00"
       samstag: "11:00-17:00"
       sonntag: "11:00-17:00"
-    hinweis: "April-Oktober"
+    saison:
+      von: 4
+      bis: 10
 
   - name: "Gasthaus Wotschofska"
     osm_name: "Wotschofska"
