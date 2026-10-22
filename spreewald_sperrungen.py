@@ -141,18 +141,51 @@ def hav(lat1, lon1, lat2, lon2):
 
 
 class Geo:
-    """Overpass-Abfragen mit Datei-Cache (geo_cache.json) -> täglicher Lauf bleibt schnell."""
+    """Overpass-Abfragen mit dauerhaftem Zwischenspeicher (state/geo_cache.json, wird mit ins Repository
+    gesichert). Sind die OSM-Server überlastet, wird der zuletzt erfolgreiche Stand verwendet - so
+    verschwinden Kanäle und Gaststätten nicht mehr von der Karte, nur weil OSM gerade nicht antwortet."""
+
+    MAX_FEHLER = 2          # so viele Abfragen hintereinander ohne jeden erreichbaren Server -> Rest aus Speicher
 
     def __init__(self, offline):
-        self.path = HERE / "geo_cache.json"
-        self.cache = json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {}
+        self.path = HERE / "state" / "geo_cache.json"
+        self.cache = {}
+        for pfad in (HERE / "geo_cache.json", self.path):          # alter Speicherort wird übernommen
+            if pfad.exists():
+                try:
+                    for ql, wert in json.loads(pfad.read_text(encoding="utf-8")).items():
+                        self.cache[ql] = wert if isinstance(wert, dict) else {"t": 0, "e": wert}
+                except Exception as ex:
+                    print(f"  ! Zwischenspeicher {pfad.name} unlesbar ({ex})", file=sys.stderr)
         self.offline = offline
+        self.fehler_folge = 0
+        self.aus_speicher = 0
+        self.letzter_status = ""      # frisch | alt | leer | fehler  (für erfassen.html)
 
-    def query(self, ql):
+    def _speichern(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(self.cache, ensure_ascii=False), encoding="utf-8")
+
+    def _alt(self, ql, grund):
+        self.letzter_status = "alt" if ql in self.cache else ("leer" if grund == "keine Treffer mehr" else "fehler")
         if ql in self.cache:
-            return self.cache[ql]
+            self.aus_speicher += 1
+            print(f"  ~ {grund} -> letzter bekannter Stand verwendet: {ql[:80]}", file=sys.stderr)
+            return self.cache[ql]["e"]
+        print(f"  ? {grund}, auch nichts im Speicher: {ql[:80]}", file=sys.stderr)
+        return []
+
+    def query(self, ql, max_age_h=24 * 30):
+        """max_age_h: so lange gilt ein gespeichertes Ergebnis als aktuell (Gewässer 30 Tage,
+        Gaststätten/Öffnungszeiten 20 Stunden). Ältere Ergebnisse dienen nur noch als Rückfall."""
+        eintrag = self.cache.get(ql)
+        self.letzter_status = "frisch"
+        if eintrag and time.time() - eintrag["t"] < max_age_h * 3600:
+            return eintrag["e"]
         if self.offline:
-            return []
+            return eintrag["e"] if eintrag else []
+        if self.fehler_folge >= self.MAX_FEHLER:
+            return self._alt(ql, "OSM-Server nicht erreichbar")
         for url in OVERPASS_URLS:
             host = url.split("/")[2]
             try:
@@ -160,17 +193,26 @@ class Geo:
             except Exception as e:                          # nächsten Server probieren
                 print(f"  ! {host}: {e}", file=sys.stderr)
                 continue
+            self.fehler_folge = 0
             if js.get("remark"):
                 print(f"  ! Overpass-Hinweis: {js['remark']}", file=sys.stderr)
             elements = js.get("elements", [])
-            if elements:                                    # leere Antworten NICHT dauerhaft merken
-                self.cache[ql] = elements
-                self.path.write_text(json.dumps(self.cache), encoding="utf-8")
-            else:
-                print(f"  ? keine Treffer: {ql[:90]}", file=sys.stderr)
             time.sleep(4)                                   # Server nicht überlasten
-            return elements
-        return []
+            if elements:
+                self.cache[ql] = {"t": time.time(), "e": elements}
+                self._speichern()
+                return elements
+            if js.get("remark"):                            # abgebrochene Abfrage ist kein echtes "nichts"
+                return self._alt(ql, "Abfrage abgebrochen")
+            if eintrag:                                     # früher gefunden, jetzt nicht: lieber alten Stand
+                return self._alt(ql, "keine Treffer mehr")
+            print(f"  ? keine Treffer: {ql[:90]}", file=sys.stderr)
+            self.letzter_status = "leer"
+            return []
+        self.fehler_folge += 1
+        if self.fehler_folge >= self.MAX_FEHLER:
+            print("  ! OSM-Server überlastet - restliche Abfragen dieses Laufs aus dem Speicher", file=sys.stderr)
+        return self._alt(ql, "kein OSM-Server erreichbar")
 
     @staticmethod
     def _post(url, ql):
@@ -188,6 +230,14 @@ class Geo:
         return [[[p["lat"], p["lon"]] for p in el["geometry"]]
                 for el in self.query(ql) if el.get("geometry")]
 
+    def ways_regex(self, pattern):
+        """Wie ways(), aber mit freiem Suchmuster ohne Groß-/Kleinschreibung - verträgt Schreibvarianten
+        wie 'III. Freiheitskanal', 'III Freiheitskanal', 'Dritter Freiheitskanal'."""
+        pat = str(pattern).replace('"', '\\"')
+        ql = f'[out:json][timeout:60];way["waterway"]["name"~"{pat}",i]({BBOX});out geom;'
+        return [[[p["lat"], p["lon"]] for p in el["geometry"]]
+                for el in self.query(ql) if el.get("geometry")]
+
     def anchors(self, pattern):
         ql = f'[out:json][timeout:60];nwr["name"~"{pattern}"]({BBOX});out center;'
         out = []
@@ -196,6 +246,52 @@ class Geo:
             if c and [c["lat"], c["lon"]] not in out:
                 out.append([c["lat"], c["lon"]])
         return out[:3]
+
+    def poi(self, name_pattern):
+        """Sucht eine Gaststätte nach Namen (Groß-/Kleinschreibung egal), liefert Position + OSM-Tags.
+        Auch Hotels/Pensionen werden gefunden (viele Gasthöfe sind bei OSM so eingetragen); ein Eintrag
+        als Restaurant/Café hat aber Vorrang."""
+        teile = [re.sub(r"[^\w.]", ".", t) for t in re.split(r"[\s\-]+", str(name_pattern).strip()) if t]
+        pat = "[ -]?".join(teile)
+        ql = (f'[out:json][timeout:60];('
+              f'nwr["name"~"{pat}",i]["amenity"~"^(restaurant|cafe|bar|pub|fast_food|biergarten)$"]({BBOX});'
+              f'nwr["name"~"{pat}",i]["tourism"~"^(hotel|guest_house|chalet|hostel)$"]({BBOX});'
+              f');out center tags;')
+        treffer = []
+        for el in self.query(ql, max_age_h=20):
+            c = el if "lat" in el else el.get("center")
+            if c:
+                treffer.append({"lat": c["lat"], "lon": c["lon"], "tags": el.get("tags", {}),
+                                "osm": f"{el.get('type')}/{el.get('id')}"})
+        treffer.sort(key=lambda t: (0 if "amenity" in t["tags"] else 1,
+                                    0 if t["tags"].get("opening_hours") else 1))
+        return treffer[0] if treffer else None
+
+    def poi_by_id(self, osm_id):
+        """Genau ein OSM-Objekt ('node/123', 'way/456', 'relation/789') - eindeutiger als die Namenssuche."""
+        m = re.match(r"^(node|way|relation)/(\d+)$", str(osm_id).strip())
+        if not m:
+            raise ValueError(f"osm_id '{osm_id}' hat nicht die Form node/123, way/123 oder relation/123")
+        for el in self.query(f'[out:json][timeout:60];{m.group(1)}({m.group(2)});out center tags;', max_age_h=20):
+            c = el if "lat" in el else el.get("center")
+            if c:
+                return {"lat": c["lat"], "lon": c["lon"], "tags": el.get("tags", {}),
+                        "osm": f"{el.get('type')}/{el.get('id')}"}
+        return None
+
+    def pois_umgebung(self):
+        """Alle Gaststätten/Cafés im Spreewald, für die bei OSM Öffnungszeiten hinterlegt sind.
+        Nur für die Auswahlliste in erfassen.html - erscheinen NICHT automatisch auf der Karte."""
+        ql = ('[out:json][timeout:90];'
+              'nwr["amenity"~"^(restaurant|cafe|bar|pub|fast_food|biergarten)$"]["name"]["opening_hours"]'
+              f'({BBOX});out center tags;')
+        out = []
+        for el in self.query(ql, max_age_h=20):
+            c = el if "lat" in el else el.get("center")
+            if c:
+                out.append({"lat": c["lat"], "lon": c["lon"], "tags": el.get("tags", {}),
+                            "osm": f"{el.get('type')}/{el.get('id')}"})
+        return out
 
 
 def clip(line, anchors, radius):
@@ -222,32 +318,47 @@ def build_geometry(rule, geo):
         return out
     radius = rule.get("radius_m", 300)
     anchors = geo.anchors(rule["near"]) if rule.get("near") else []
-    if rule.get("ways") and rule.get("near") and not anchors:
+    if (rule.get("ways") or rule.get("ways_regex")) and rule.get("near") and not anchors:
         return []            # Abschnitt nicht bestimmbar -> lieber "nicht verortet" als die ganze Linie
     lines = geo.ways(rule["ways"]) if rule.get("ways") else []
+    if not lines and rule.get("ways_regex"):              # Rückfall: tolerante Suche nach Schreibvarianten
+        lines = geo.ways_regex(rule["ways_regex"])
     if lines and anchors:
         lines = [seg for l in lines for seg in clip(l, anchors, radius)]
     if lines:
         return [{"t": "line", "c": l} for l in lines]
-    if anchors and not rule.get("ways"):
+    if anchors and not (rule.get("ways") or rule.get("ways_regex")):
         return [{"t": "circle", "c": a, "r": radius} for a in anchors]
     return []
 
 
-def find_rule(rules, row):
+KATEGORIEN = ("gesperrt", "eingeschraenkt")
+
+
+def hat_geometrie(rule):
+    return bool(rule.get("manual") or rule.get("ways") or rule.get("ways_regex") or rule.get("near"))
+
+
+def find_rule(rules, row, art=None):
+    """Erste passende Regel. art="geom": nur Regeln mit Kartenposition; art="status": nur Regeln, die die
+    Kategorie (gesperrt/eingeschränkt) festlegen. So kann eine reine Kategorie-Regel keine Position verdecken."""
     g, b = row["gewaesser"].lower(), row["bereich"].lower()
     for rule in rules:
+        if art == "geom" and not hat_geometrie(rule):
+            continue
+        if art == "status" and rule.get("status") not in KATEGORIEN:
+            continue
         if rule["match"].lower() in g and rule.get("bereich", "").lower() in b:
             return rule
     return None
 
 
 # ----------------------------------------------------------------------------- 4. Karte
-def render(items, day, stand, out):
+def render(items, gaststaetten, day, stand, out):
     tpl = (HERE / "template.html").read_text(encoding="utf-8")
     data = {"datum": f"{WEEKDAYS[day.weekday()]}, {day.strftime('%d.%m.%Y')}",
             "iso": day.isoformat(), "erzeugt": berlin_now().strftime("%d.%m.%Y %H:%M"),
-            "stand": stand, "items": items}
+            "stand": stand, "items": items, "gaststaetten": gaststaetten}
     payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     Path(out).write_text(tpl.replace("__DATA__", payload), encoding="utf-8")
@@ -281,14 +392,36 @@ def compare(old_rows, new_rows):
     return added, changed, removed
 
 
-def position_hint(t, rules):
+PRUEFEN = "-> bitte auf gewaesser.html prüfen"
+
+
+def position_hint(t, rules, old=None):
+    """Kurzer Kartenhinweis für die Push-Nachricht. Bei von Hand gezeichneten Positionen wird zur Prüfung
+    aufgefordert, weil eine geänderte LBV-Meldung an anderer Stelle liegen oder anders formuliert sein kann."""
     row = dict(zip(KEYS, t))
     if row["gewaesser"].lower().startswith("oberspreewald"):
         return "Gebietshinweis (keine Kartenposition nötig)"
-    rule = find_rule(rules, row)
-    if rule and (rule.get("manual") or rule.get("ways") or rule.get("near")):
-        return "Position hinterlegt"
-    return "ACHTUNG: KEINE Position hinterlegt -> bitte in gewaesser.yaml ergänzen"
+    rule = find_rule(rules, row, "geom")
+    if old is not None:
+        alt = find_rule(rules, dict(zip(KEYS, old)), "geom")
+        if alt is not None and alt is not rule and alt.get("manual"):
+            return f"ACHTUNG: passt nicht mehr zu eurer Handzeichnung (Wortlaut geändert) {PRUEFEN}"
+    if not rule:
+        return "ACHTUNG: KEINE Position hinterlegt -> auf gewaesser.html einzeichnen"
+    if rule.get("manual"):
+        if not rule.get("bereich"):
+            return f"von Hand eingezeichnet, Regel OHNE Bereich-Stichwort (gilt fürs ganze Gewässer) {PRUEFEN}"
+        return f"von Hand eingezeichnet (Bereich „{rule['bereich']}“) {PRUEFEN}"
+    return "Position hinterlegt (automatisch aus OpenStreetMap)"
+
+
+def kategorie_hint(t, rules):
+    row = dict(zip(KEYS, t))
+    srule = find_rule(rules, row, "status")
+    if not srule:
+        return []
+    name = "eingeschränkt" if srule["status"] == "eingeschraenkt" else "gesperrt"
+    return [f"  Kategorie: von euch auf „{name}“ gesetzt – passt das noch zum LBV-Text? {PRUEFEN}"]
 
 
 def build_message(added, changed, removed, stand, rules):
@@ -308,7 +441,7 @@ def build_message(added, changed, removed, stand, rules):
             r = dict(zip(KEYS, t))
             L += [f"* {r['gewaesser']}", f"  Bereich:  {r['bereich']}", f"  Zeitraum: {r['zeitraum']}",
                   f"  Grund:    {r['grund']}", f"  Hinweis:  {r['hinweis']}",
-                  f"  Karte:    {position_hint(t, rules)}", ""]
+                  f"  Karte:    {position_hint(t, rules)}"] + kategorie_hint(t, rules) + [""]
     if changed:
         L += [f"GEÄNDERT ({len(changed)})", ""]
         for old, new in changed:
@@ -317,12 +450,14 @@ def build_message(added, changed, removed, stand, rules):
             for i, k in enumerate(KEYS):
                 if k in LABELS and old[i] != new[i]:
                     L += [f"  {LABELS[k]} vorher:  {old[i]}", f"  {LABELS[k]} jetzt:   {new[i]}"]
-            L.append("")
+            L += [f"  Karte:    {position_hint(new, rules, old)}"] + kategorie_hint(new, rules) + [""]
     if removed:
         L += [f"ENTFERNT / nicht mehr aufgeführt ({len(removed)})", ""]
         for t in removed:
             r = dict(zip(KEYS, t))
             L += [f"* {r['gewaesser']}", f"  Bereich:  {r['bereich']}", f"  Zeitraum: {r['zeitraum']}", ""]
+    if any(PRUEFEN in z or "KEINE Position" in z for z in L):
+        subject += " – Karte prüfen"
     map_url = os.environ.get("MAP_URL")
     if map_url:
         L.append(f"Karte:      {map_url}")
@@ -390,6 +525,25 @@ def notify_changes(rows, stand, rules, state_file):
         print("::warning::Änderungen erkannt, aber kein Kanal (Push/GitHub-Hinweis) aktiv - beim nächsten Lauf erneut versucht.")
 
 
+def plausibilitaet(rows, state_file, warn_file):
+    """Warnt, wenn die LBV-Tabelle plötzlich nur noch halb so viele Zeilen hat wie beim letzten Stand (oder
+    weniger) - ein typisches Zeichen, dass die LBV ihre Seite umgebaut hat und nur noch Teile erkannt werden.
+    Schreibt dann warnung.txt; der Workflow schickt sie an den Admin-Kanal. Ein Fehlalarm ist möglich, wenn
+    zum Saisonende viele Sperrungen auf einmal auslaufen - die Meldung nennt das."""
+    if not state_file.exists():
+        return
+    try:
+        alt = len(json.loads(state_file.read_text(encoding="utf-8"))["rows"])
+    except Exception:
+        return
+    if alt >= 6 and len(rows) <= alt // 2:
+        text = (f"Die LBV-Tabelle hat nur noch {len(rows)} statt {alt} Zeilen. Entweder sind viele Sperrungen "
+                f"ausgelaufen - oder die LBV hat die Seite umgebaut und das Programm erkennt nicht mehr alles. "
+                f"Bitte die LBV-Seite mit der Karte vergleichen.")
+        print("::warning::" + text, file=sys.stderr)
+        warn_file.write_text(text, encoding="utf-8")
+
+
 def load_own_notices(path, day, lookahead):
     """Liest eigene, von Mitarbeitern gepflegte Hinweise (eigene-sperrungen.yaml).
     Fehlerhafte einzelne Einträge werden übersprungen (mit Warnung), statt den ganzen Lauf abzubrechen."""
@@ -438,6 +592,213 @@ def load_own_notices(path, day, lookahead):
     return items
 
 
+# ----------------------------------------------------------------------------- 6. Gaststätten (Öffnungszeiten)
+WEEKDAY_KEYS = ["montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag", "sonntag"]
+WEEKDAY_TOKENS = {"mo": 0, "tu": 1, "we": 2, "th": 3, "fr": 4, "sa": 5, "su": 6}
+TIME_RANGE = re.compile(r"^\d{1,2}:\d{2}-\d{1,2}:\d{2}$")
+
+
+def parse_osm_week(text):
+    """Übersetzt die OpenStreetMap-Schreibweise (z. B. 'Mo-Fr 11:00-22:00; Tu off') in eine Wochenübersicht.
+    Gibt (per_day, unsicher) zurück: per_day[0..6] = "closed" oder Liste von "HH:MM-HH:MM"; nicht
+    verstandene Tage fehlen. Bei allem Unklaren lieber 'unbekannt' als eine falsche Angabe."""
+    per_day, unsicher = {}, False
+    if not text:
+        return per_day, False
+    text = text.strip()
+    if text == "24/7":
+        return {d: ["00:00-24:00"] for d in range(7)}, False
+    for rule in text.split(";"):
+        rule = rule.strip()
+        if not rule:
+            continue
+        m = re.match(r"^([A-Za-z,\-\s]+?)\s+(.+)$", rule)
+        if not m:
+            unsicher = True
+            continue
+        day_part, time_part = m.group(1), m.group(2).strip()
+        days, ok = [], True
+        for token in day_part.split(","):
+            token = token.strip()
+            if "-" in token:
+                a, b = [t.strip()[:2].lower() for t in token.split("-", 1)]
+                if a not in WEEKDAY_TOKENS or b not in WEEKDAY_TOKENS:
+                    ok = False; break
+                ai, bi = WEEKDAY_TOKENS[a], WEEKDAY_TOKENS[b]
+                days += [d % 7 for d in range(ai, bi + 1 if bi >= ai else bi + 8)]
+            else:
+                t2 = token[:2].lower()
+                if t2 not in WEEKDAY_TOKENS:
+                    ok = False; break
+                days.append(WEEKDAY_TOKENS[t2])
+        if not ok or not days:
+            unsicher = True
+            continue
+        if time_part.lower() in ("off", "closed"):
+            for d in days:
+                per_day[d] = "closed"
+            continue
+        ranges = [r.strip() for r in time_part.split(",")]
+        if not all(TIME_RANGE.match(r) for r in ranges):
+            unsicher = True
+            continue
+        for d in days:
+            per_day[d] = ranges
+    return per_day, unsicher
+
+
+def parse_opening_hours(text, weekday):
+    """Gibt (status, zeiten_text, unsicher) für einen Wochentag zurück. status: 'offen' | 'ruhetag' | 'unbekannt'."""
+    if text and text.strip() == "24/7":
+        return "offen", "durchgehend geöffnet", False
+    per_day, unsicher = parse_osm_week(text)
+    if weekday not in per_day:
+        return "unbekannt", "", unsicher
+    if per_day[weekday] == "closed":
+        return "ruhetag", "", unsicher
+    return "offen", ", ".join(r.replace("-", "–") for r in per_day[weekday]), unsicher
+
+
+def osm_week_as_zeiten(text):
+    """OSM-Öffnungszeiten im selben Format wie 'zeiten:' in gaststaetten.yaml (für erfassen.html)."""
+    per_day, unsicher = parse_osm_week(text)
+    zeiten = {}
+    for d, wert in per_day.items():
+        zeiten[WEEKDAY_KEYS[d]] = "Ruhetag" if wert == "closed" else ", ".join(wert)
+    return zeiten, unsicher
+
+
+WEEKDAY_DE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober",
+          "November", "Dezember"]
+
+
+def parse_saison(saison):
+    """'saison: {von: 4, bis: 10}' (Monatszahlen 1-12, beide einschließlich) -> (von, bis); bei einer
+    unbrauchbaren Angabe None (dann wird der Eintrag als 'unbekannt' gezeigt statt zu raten)."""
+    try:
+        von, bis = int(saison["von"]), int(saison["bis"])
+    except Exception:
+        return None
+    return (von, bis) if 1 <= von <= 12 and 1 <= bis <= 12 else None
+
+
+def in_saison(von, bis, monat):
+    """Liegt 'monat' in der Saison? Auch über den Jahreswechsel möglich (z. B. von 11 bis 3)."""
+    return von <= monat <= bis if von <= bis else (monat >= von or monat <= bis)
+
+
+DAY_TIME_RANGE = re.compile(r"^\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}(\s*,\s*\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})*$")
+
+
+def load_restaurants(path, day, geo, osm_info=None):
+    """Liest die kuratierte Liste eurer Gaststätten (gaststaetten.yaml) und ermittelt für 'day', ob heute
+    geöffnet, Ruhetag oder unbekannt ist. Ein fehlerhafter Eintrag wird übersprungen, nicht der ganze Lauf."""
+    if not path.exists():
+        return []
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception as e:
+        print(f"::warning::gaststaetten.yaml konnte nicht gelesen werden: {e}", file=sys.stderr)
+        return []
+    weekday = day.weekday()
+    items = []
+    for i, e in enumerate(data.get("gaststaetten") or [], start=1):
+        try:
+            name = str(e["name"]).strip()
+            hinweis = str(e.get("hinweis", "")).strip()
+            punkt = e.get("punkt")
+            osm_name = e.get("osm_name")
+            osm_id = e.get("osm_id")
+            osm_tags, treffer = {}, None
+            hat_zeiten = isinstance(e.get("zeiten"), dict) and bool(e.get("zeiten"))
+            if punkt and hat_zeiten:
+                pass                                         # alles von Hand da -> OSM gar nicht erst fragen
+            elif osm_id:
+                treffer = geo.poi_by_id(osm_id)
+            elif osm_name:
+                treffer = geo.poi(osm_name)
+            if treffer:
+                if not punkt:
+                    punkt = [treffer["lat"], treffer["lon"]]
+                osm_tags = treffer["tags"]
+            if osm_info is not None and punkt and hat_zeiten:
+                osm_info[name] = {"gefunden": False, "abfrage": "nicht_noetig", "punkt": None, "osm": "",
+                                  "osm_name": "", "opening_hours": "", "woche": {}, "unsicher": False}
+            elif osm_info is not None:                        # für erfassen.html: was OSM zu diesem Eintrag weiß
+                oh = osm_tags.get("opening_hours", "")
+                woche, unsicher_w = osm_week_as_zeiten(oh)
+                osm_info[name] = {"gefunden": bool(treffer), "abfrage": geo.letzter_status,
+                                  "punkt": [round(treffer["lat"], 6), round(treffer["lon"], 6)] if treffer else None,
+                                  "osm": treffer["osm"] if treffer else "",
+                                  "osm_name": osm_tags.get("name", ""), "opening_hours": oh,
+                                  "woche": woche, "unsicher": unsicher_w}
+            if not punkt:
+                raise ValueError("weder 'punkt' angegeben noch über 'osm_name' bei OpenStreetMap gefunden")
+
+            zeiten_woche = e.get("zeiten")                     # {"montag": "11:00-20:00", "dienstag": "Ruhetag", ...}
+            unsicher = False
+            if isinstance(zeiten_woche, dict):                 # von Hand, Tag für Tag -> hat Vorrang vor OSM
+                quelle = "manuell"
+                wert = zeiten_woche.get(WEEKDAY_KEYS[weekday])
+                if wert is None:
+                    status, zeiten = "unbekannt", ""
+                elif str(wert).strip().lower() == "ruhetag":
+                    status, zeiten = "ruhetag", ""
+                elif DAY_TIME_RANGE.match(str(wert).strip()):
+                    status = "offen"
+                    zeiten = ", ".join(r.strip().replace(" ", "").replace("-", "–") for r in str(wert).split(","))
+                else:
+                    print(f"::warning::gaststaetten.yaml, '{name}': Zeitangabe für {WEEKDAY_KEYS[weekday]} "
+                          f"('{wert}') nicht erkannt, wird als unbekannt angezeigt", file=sys.stderr)
+                    status, zeiten = "unbekannt", ""
+            else:
+                status, zeiten, unsicher = parse_opening_hours(osm_tags.get("opening_hours", ""), weekday)
+                quelle = "osm"
+
+            saison_text = ""                                   # optional: nur saisonal geöffnet
+            if e.get("saison") is not None:
+                grenzen = parse_saison(e["saison"])
+                if grenzen is None:
+                    print(f"::warning::gaststaetten.yaml, '{name}': 'saison' nicht verstanden (erwartet: von und bis "
+                          f"als Monatszahl 1-12), wird als unbekannt angezeigt", file=sys.stderr)
+                    status, zeiten = "unbekannt", ""
+                else:
+                    saison_text = f"{MONATE[grenzen[0] - 1]}–{MONATE[grenzen[1] - 1]}"
+                    if not in_saison(grenzen[0], grenzen[1], day.month):
+                        status, zeiten = "saisonpause", ""
+
+            items.append(dict(name=name, status=status, zeiten=zeiten, hinweis=hinweis, quelle=quelle,
+                              unsicher=unsicher, saison=saison_text,
+                              geom=[{"t": "poi", "c": [float(punkt[0]), float(punkt[1])]}]))
+        except Exception as ex:
+            print(f"::warning::gaststaetten.yaml, Eintrag {i} übersprungen ({ex})", file=sys.stderr)
+    return items
+
+
+def write_restaurant_osm_data(osm_info, geo, out):
+    """Schreibt docs/gaststaetten_osm.json für erfassen.html: OSM-Öffnungszeiten der eingetragenen Gaststätten
+    und aller Gaststätten der Umgebung, die bei OSM Öffnungszeiten haben. Die Karte selbst nutzt das nicht."""
+    try:
+        umgebung = []
+        treffer_umgebung = geo.pois_umgebung()
+        for p in treffer_umgebung:
+            t = p["tags"]
+            woche, unsicher = osm_week_as_zeiten(t.get("opening_hours", ""))
+            ort = t.get("addr:city") or t.get("addr:place") or t.get("addr:suburb") or ""
+            umgebung.append({"name": t.get("name", ""), "osm": p["osm"], "ort": ort,
+                             "art": t.get("amenity", ""), "lat": round(p["lat"], 6), "lon": round(p["lon"], 6),
+                             "opening_hours": t.get("opening_hours", ""), "woche": woche, "unsicher": unsicher})
+        umgebung.sort(key=lambda x: x["name"].lower())
+        data = {"erzeugt": berlin_now().strftime("%d.%m.%Y %H:%M"), "eintraege": osm_info, "umgebung": umgebung,
+                "umgebung_status": geo.letzter_status}
+        out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"OSM-Daten für erfassen.html: {len(osm_info)} eingetragene, {len(umgebung)} in der Umgebung")
+    except Exception as ex:
+        print(f"::warning::gaststaetten_osm.json nicht geschrieben ({ex}) - Karte ist davon nicht betroffen",
+              file=sys.stderr)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", help="YYYY-MM-DD (Standard: heute)")
@@ -464,7 +825,12 @@ def main():
             continue
         row["status"] = st
         row["geom"], row["genau"] = [], True
-        rule = find_rule(rules, row)
+        rule = find_rule(rules, row, "geom")
+        row["regel"] = next((n for n, r in enumerate(rules) if r is rule), None)   # für gewaesser.html
+        srule = find_rule(rules, row, "status")          # von euch angepasste Kategorie
+        if srule and st in KATEGORIEN and srule["status"] != st:
+            row["status_lbv"] = st                        # auf der Karte als "angepasst" gekennzeichnet
+            st = row["status"] = srule["status"]
         if rule and st != "gebiet":
             row["geom"] = build_geometry(rule, geo)
             row["genau"] = rule.get("genau", True)
@@ -475,13 +841,23 @@ def main():
     eigene = load_own_notices(HERE / "eigene-sperrungen.yaml", day, a.lookahead)
     items.extend(eigene)
 
-    render(items, day, stand, a.out)
+    osm_info = {}
+    gaststaetten = load_restaurants(HERE / "gaststaetten.yaml", day, geo, osm_info)
+
+    render(items, gaststaetten, day, stand, a.out)
+    write_restaurant_osm_data(osm_info, geo, Path(a.out).with_name("gaststaetten_osm.json"))
+    for g in gaststaetten:
+        print(f"Gaststätte      {g['status']:15} auf Karte  {g['name']}")
+    for name, info in osm_info.items():
+        if not info["gefunden"] and name not in {g["name"] for g in gaststaetten}:
+            print(f"Gaststätte      FEHLT (bei OpenStreetMap nicht gefunden, Koordinaten nachtragen): {name}")
     for i in items:
         marker = " (eigen)" if i.get("quelle") == "eigen" else ""
         print(f"{i['status']:15} {'auf Karte ' if i['geom'] else 'OHNE Geo  '} {i['gewaesser']}{marker} | {i['bereich'][:60]}")
     print(f"\n{len(items)} Einträge für {day} -> {a.out}")
 
     if a.notify:
+        plausibilitaet(rows, Path(a.state_file), HERE / "warnung.txt")
         notify_changes(rows, stand, rules, Path(a.state_file))
     if a.test_push:
         subj = "Spreewald-Sperrkarte: Testnachricht"
