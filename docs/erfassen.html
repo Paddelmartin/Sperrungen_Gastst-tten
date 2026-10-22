@@ -22,7 +22,7 @@
   .card h2{font-size:15px;color:var(--brand-blue-dark);margin:0 0 12px}
   .card.editing{border-color:var(--brand-orange);box-shadow:0 0 0 2px rgba(236,109,40,.18)}
   label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px;color:#3a4048}
-  input[type=text],input[type=password],input[type=search],textarea{width:100%;box-sizing:border-box;padding:8px 10px;
+  input[type=text],input[type=password],input[type=search],textarea,select{width:100%;background:#fff;box-sizing:border-box;padding:8px 10px;
     border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:13.5px}
   input:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--brand-blue);outline-offset:2px}
   .hint{font-size:11.5px;color:#8a92a0;margin-top:3px;line-height:1.5}
@@ -159,6 +159,14 @@
         „Ruhetag“ erscheint auf der Karte als „unbekannt“.</div>
     </div>
 
+    <label>Saison (optional)</label>
+    <div class="row2">
+      <div><div class="hint">Von Monat</div><select id="f-saison-von"></select></div>
+      <div><div class="hint">Bis Monat (einschließlich)</div><select id="f-saison-bis"></select></div>
+    </div>
+    <div class="hint">Nur ausfüllen, wenn die Gaststätte nur saisonal geöffnet hat (z. B. April bis Oktober). Außerhalb
+      der Saison zeigt die Karte „Saisonpause“ statt „Heute geöffnet“. Beide Felder leer = ganzjährig.</div>
+
     <label for="f-hinweis">Hinweis (optional)</label>
     <input type="text" id="f-hinweis" placeholder="z. B. Saisonal April–Oktober, Reservierung empfohlen">
 
@@ -243,6 +251,8 @@ const HEADER = `# Gaststätten in der Nähe
 #   punkt     sonst: Koordinate von Hand [Breite, Länge]
 #   zeiten    Öffnungszeiten von Hand je Wochentag, haben Vorrang vor OpenStreetMap
 #             ("11:00-20:00", geteilt "11:00-14:00, 17:00-22:00" oder "Ruhetag")
+#   saison    nur saisonal geöffnet: von/bis als Monatszahl 1-12, einschließlich (z. B. von: 4, bis: 10).
+#             Außerhalb der Saison zeigt die Karte "Saisonpause" statt "geöffnet"
 #   hinweis   freier Zusatztext
 #
 # Ein Eintrag mit einem Fehler wird übersprungen (Warnung im Ablauf-Protokoll bei GitHub Actions),
@@ -255,7 +265,13 @@ const TAGE = [
   {key:'montag', kurz:'Mo'}, {key:'dienstag', kurz:'Di'}, {key:'mittwoch', kurz:'Mi'},
   {key:'donnerstag', kurz:'Do'}, {key:'freitag', kurz:'Fr'}, {key:'samstag', kurz:'Sa'}, {key:'sonntag', kurz:'So'}
 ];
-const BEKANNTE_FELDER = ['name','osm_id','osm_name','punkt','zeiten','hinweis'];
+const BEKANNTE_FELDER = ['name','osm_id','osm_name','punkt','zeiten','saison','hinweis'];
+const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+function saisonText(s){                                   // "April–Oktober" oder '' bei fehlender/unbrauchbarer Angabe
+  if(!s || typeof s !== 'object') return '';
+  const v = Number(s.von), b = Number(s.bis);
+  return (v >= 1 && v <= 12 && b >= 1 && b <= 12) ? MONATE[v-1] + '–' + MONATE[b-1] : '';
+}
 
 // ---------------------------------------------------------------- Zustand
 let entries = [];            // aktuelle Liste (so, wie sie gespeichert würde)
@@ -269,6 +285,10 @@ let osmDaten = null;         // docs/gaststaetten_osm.json
 const $ = id => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls;
   if(text != null) e.textContent = text; return e; };
+['f-saison-von','f-saison-bis'].forEach(id => {            // Monatsauswahl für das Saison-Feld füllen
+  const s = $(id); s.append(new Option('– keine Angabe –', ''));
+  MONATE.forEach((m,i) => s.append(new Option(m, String(i+1))));
+});
 const token = () => { try{ return localStorage.getItem(TOKEN_KEY) || ''; }catch(_){ return ''; } };
 
 // ---------------------------------------------------------------- Laden
@@ -388,6 +408,8 @@ function renderList(){
     }else{
       left.append(el('div','meta','Zeiten automatisch von OpenStreetMap'));
     }
+    if(saisonText(e.saison)) left.append(el('div','meta','Saison: ' + saisonText(e.saison)));
+    else if(e.saison !== undefined) left.append(el('div','warnzeile','Saison-Angabe nicht verständlich – bitte „Bearbeiten“ und neu wählen.'));
     if(e.hinweis) left.append(el('div','meta', e.hinweis));
 
     const buttons = el('div','item-buttons');
@@ -526,7 +548,8 @@ function setZeitart(wert){
 }
 
 function resetForm(){
-  ['f-name','f-osmname','f-lat','f-lon','f-hinweis','f-std-von','f-std-bis'].forEach(id => $(id).value = '');
+  ['f-name','f-osmname','f-lat','f-lon','f-hinweis','f-std-von','f-std-bis','f-saison-von','f-saison-bis']
+    .forEach(id => $(id).value = '');
   TAGE.forEach(t => setTag(t.key, ''));
   formOsmId = ''; formOsmWoche = null; formOsmPunkt = null;
   if(gMarker){ gKarte.removeLayer(gMarker); gMarker = null; }
@@ -571,6 +594,9 @@ function formZuEintrag(){
     if(!Object.keys(zeiten).length) throw 'Bei „Selbst festlegen“ bitte mindestens einen Tag ausfüllen – oder „Automatisch“ wählen.';
     e.zeiten = zeiten;
   }
+  const sv = $('f-saison-von').value, sb = $('f-saison-bis').value;
+  if(sv && sb) e.saison = {von: parseInt(sv,10), bis: parseInt(sb,10)};
+  else if(sv || sb) throw 'Saison: bitte „Von Monat“ und „Bis Monat“ ausfüllen (oder beide leer lassen).';
   const hinweis = $('f-hinweis').value.trim();
   if(hinweis) e.hinweis = hinweis;
   return Object.assign(e, basis);
@@ -609,6 +635,9 @@ function editEntry(i){
     osmZeitenInsFormular(false);      // vorbereitet, falls ihr auf „Selbst festlegen“ umschaltet
     setZeitart('osm');
   }
+  const sj = e.saison && typeof e.saison === 'object' ? e.saison : null;
+  $('f-saison-von').value = sj && saisonText(sj) ? String(sj.von) : '';
+  $('f-saison-bis').value = sj && saisonText(sj) ? String(sj.bis) : '';
   $('f-hinweis').value = e.hinweis || '';
   formModus(); renderList();
   $('form-card').scrollIntoView({behavior:'smooth', block:'start'});
@@ -694,6 +723,8 @@ function renderYaml(liste){
       out += `    zeiten:\n`;
       TAGE.forEach(t => { if(e.zeiten[t.key]) out += `      ${t.key}: ${yamlQuote(e.zeiten[t.key])}\n`; });
     }
+    if(saisonText(e.saison)) out += `    saison:\n      von: ${Number(e.saison.von)}\n      bis: ${Number(e.saison.bis)}\n`;
+    else if(e.saison !== undefined) out += jsyaml.dump({saison: e.saison}, {lineWidth:-1}).split('\n').filter(Boolean).map(z => '    ' + z).join('\n') + '\n';   // unverständliche Angabe nicht stillschweigend löschen
     if(e.hinweis) out += `    hinweis: ${yamlQuote(e.hinweis)}\n`;
     Object.keys(e).filter(k => !BEKANNTE_FELDER.includes(k)).forEach(k=>{
       out += jsyaml.dump({[k]: e[k]}, {lineWidth:-1}).split('\n').filter(Boolean).map(z => '    ' + z).join('\n') + '\n';
