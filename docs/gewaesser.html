@@ -210,6 +210,14 @@
       </div>
       <div id="token-status"></div>
     </details>
+    <details id="admintest-details">
+      <summary>Für Betreiber: Admin-Kanal testen</summary>
+      <div style="margin:8px 0;font-size:12.5px;line-height:1.5;color:#6b7480">Schickt eine Testnachricht an den privaten Admin-Kanal
+        (dorthin gehen Ausfall- und Prüfmeldungen). So seht ihr, ob das Secret <code>NTFY_ADMIN_TOPIC</code> bei GitHub gesetzt ist
+        und euer Handy den Kanal abonniert hat. Die Nachricht kommt nach etwa 1–2 Minuten. Braucht den eingerichteten Zugangsschlüssel.</div>
+      <button class="btn-secondary" onclick="adminTestSenden()">Testnachricht senden</button>
+      <div id="admintest-info" style="margin-top:8px;font-size:12.5px;line-height:1.5"></div>
+    </details>
   </div>
 
   <!-- Karte (wird in das jeweils offene Formular verschoben) -->
@@ -843,6 +851,36 @@ function tokenEntfernen(){
   tokenAnzeige(); $('token-status').style.color = ''; $('token-status').textContent = 'Von diesem Gerät entfernt.';
 }
 function tokenAnzeige(){ $('token-summary').textContent = token() ? 'Speichern ist auf diesem Gerät eingerichtet' : 'Zugangsschlüssel eintragen'; }
+
+// ---------------------------------------------------------------- Betreiber-Test: Admin-Kanal
+// Legt state/admin-test.txt mit dem Commit-Text "Admin-Test angefordert" an; dadurch startet bei GitHub der
+// Workflow-Job "admintest", der über das Secret NTFY_ADMIN_TOPIC eine Testnachricht sendet.
+async function adminTestSenden(){
+  const info = $('admintest-info'), t = token();
+  const zeige = (art, text) => { info.style.color = art === 'err' ? 'var(--err)' : art === 'ok' ? 'var(--ok)' : ''; info.textContent = text; };
+  if(!t){ zeige('err', 'Zuerst oben den Zugangsschlüssel eintragen.'); return; }
+  zeige('', 'Sende …');
+  const url = `https://api.github.com/repos/${REPO}/contents/state/admin-test.txt`;
+  const kopf = {'Accept':'application/vnd.github+json', 'Authorization':'Bearer ' + t};
+  try{
+    let sha = null;
+    const g = await fetch(`${url}?ref=${BRANCH}`, {headers: kopf, cache:'no-store'});
+    if(g.ok) sha = (await g.json()).sha;
+    else if(g.status !== 404) throw g.status;
+    const body = {message: 'Admin-Test angefordert', branch: BRANCH, content: btoa(new Date().toISOString() + '\n')};
+    if(sha) body.sha = sha;
+    const r = await fetch(url, {method:'PUT', headers: {...kopf, 'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    if(!r.ok) throw r.status;
+    zeige('ok', 'Testauftrag ist bei GitHub angekommen. Die Nachricht sollte in 1–2 Minuten auf dem Handy erscheinen. '
+      + 'Kommt nichts: bei GitHub unter „Actions“ den Lauf „Admin-Test angefordert“ ansehen (rot = Secret NTFY_ADMIN_TOPIC fehlt) '
+      + 'und prüfen, ob die ntfy-App den Kanal abonniert hat.');
+  }catch(status){
+    zeige('err', status === 401 ? 'Der Zugangsschlüssel ist ungültig oder abgelaufen.'
+      : (status === 403 || status === 404) ? 'Der Zugangsschlüssel darf nicht in dieses Repository schreiben (Contents: Read and write?).'
+      : (status === 409 || status === 422) ? 'Gerade wurde gleichzeitig etwas geändert – bitte noch einmal tippen.'
+      : 'Der Test konnte nicht ausgelöst werden' + (typeof status === 'number' ? ` (HTTP ${status}).` : ' (keine Verbindung zu GitHub).'));
+  }
+}
 
 // ================================================================ Start
 window.addEventListener('beforeunload', e => { if(geaendert().length){ e.preventDefault(); e.returnValue = ''; } });
