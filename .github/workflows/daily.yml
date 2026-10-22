@@ -8,11 +8,15 @@ on:
     - cron: "13 3-15 * * *"
   push:                       # Pflege-Seite gespeichert -> Karte sofort neu bauen (ohne Push-Nachricht)
     branches: [main]
-    paths: [gaststaetten.yaml, gewaesser.yaml, eigene-sperrungen.yaml]
+    paths: [gaststaetten.yaml, gewaesser.yaml, eigene-sperrungen.yaml, state/admin-test.txt]   # admin-test.txt: Testknopf auf den Pflege-Seiten
   workflow_dispatch:
     inputs:
       testpush:
         description: "Nur eine Test-Push-Nachricht senden, um die ntfy-Einstellungen zu prüfen"
+        type: boolean
+        default: false
+      testadmin:
+        description: "Test-Nachricht an den Admin-Kanal senden (Secret NTFY_ADMIN_TOPIC prüfen)"
         type: boolean
         default: false
 concurrency: { group: sperrkarte, cancel-in-progress: false }   # Läufe nacheinander statt gleichzeitig
@@ -95,3 +99,20 @@ jobs:
           curl -fsS -H "Title: Sperrkarte - Lauf fehlgeschlagen" -H "Priority: high" -H "Tags: warning" \
             -d "Der automatische Lauf der Spreewald-Sperrkarte ist fehlgeschlagen, die Karte kann veraltet sein. Protokoll: $RUN_URL" \
             "${NTFY_SERVER:-https://ntfy.sh}/$NTFY_ADMIN_TOPIC" || echo "Admin-Push konnte nicht gesendet werden."
+  admintest:                  # Test des Admin-Kanals: Knopf auf erfassen.html/gewaesser.html oder manueller Start mit "testadmin"
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.testadmin) || (github.event_name == 'push' && contains(github.event.head_commit.message, 'Admin-Test')) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test-Push an den Admin-Kanal
+        env:
+          NTFY_ADMIN_TOPIC: ${{ secrets.NTFY_ADMIN_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+        run: |
+          if [ -z "$NTFY_ADMIN_TOPIC" ]; then
+            echo "::error::Das Secret NTFY_ADMIN_TOPIC ist nicht gesetzt (GitHub: Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          curl -fsS -H "Title: Sperrkarte - Test Admin-Kanal" -H "Tags: white_check_mark" \
+            -d "Test erfolgreich: Der Admin-Kanal funktioniert. Hier kommen kuenftig Fehler- und Pruefmeldungen an." \
+            "${NTFY_SERVER:-https://ntfy.sh}/$NTFY_ADMIN_TOPIC"
+          echo "Testnachricht gesendet."
