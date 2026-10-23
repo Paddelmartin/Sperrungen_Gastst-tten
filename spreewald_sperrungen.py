@@ -396,11 +396,12 @@ PRUEFEN = "-> bitte auf gewaesser.html prüfen"
 
 
 def position_hint(t, rules, old=None):
-    """Kurzer Kartenhinweis für die Push-Nachricht. Bei von Hand gezeichneten Positionen wird zur Prüfung
-    aufgefordert, weil eine geänderte LBV-Meldung an anderer Stelle liegen oder anders formuliert sein kann."""
+    """Kartenhinweis für die Push-Nachricht - nur, wenn etwas zu tun ist (keine Position, Handzeichnung passt nicht
+    mehr, Regel ohne Bereich-Stichwort). Ist die Sperrung ordentlich auf der Karte verortet, kommt "" zurück und
+    die Nachricht enthält keine Karten-Zeile."""
     row = dict(zip(KEYS, t))
     if row["gewaesser"].lower().startswith("oberspreewald"):
-        return "Gebietshinweis (keine Kartenposition nötig)"
+        return ""
     rule = find_rule(rules, row, "geom")
     if old is not None:
         alt = find_rule(rules, dict(zip(KEYS, old)), "geom")
@@ -411,8 +412,11 @@ def position_hint(t, rules, old=None):
     if rule.get("manual"):
         if not rule.get("bereich"):
             return f"von Hand eingezeichnet, Regel OHNE Bereich-Stichwort (gilt fürs ganze Gewässer) {PRUEFEN}"
-        return f"von Hand eingezeichnet (Bereich „{rule['bereich']}“) {PRUEFEN}"
-    return "Position hinterlegt (automatisch aus OpenStreetMap)"
+    return ""                                              # verortet (von Hand oder aus OpenStreetMap): kein Hinweis nötig
+
+
+def karte_zeile(hinweis):
+    return [f"  Karte:    {hinweis}"] if hinweis else []
 
 
 def kategorie_hint(t, rules):
@@ -441,7 +445,7 @@ def build_message(added, changed, removed, stand, rules):
             r = dict(zip(KEYS, t))
             L += [f"* {r['gewaesser']}", f"  Bereich:  {r['bereich']}", f"  Zeitraum: {r['zeitraum']}",
                   f"  Grund:    {r['grund']}", f"  Hinweis:  {r['hinweis']}",
-                  f"  Karte:    {position_hint(t, rules)}"] + kategorie_hint(t, rules) + [""]
+                  ] + karte_zeile(position_hint(t, rules)) + kategorie_hint(t, rules) + [""]
     if changed:
         L += [f"GEÄNDERT ({len(changed)})", ""]
         for old, new in changed:
@@ -450,7 +454,7 @@ def build_message(added, changed, removed, stand, rules):
             for i, k in enumerate(KEYS):
                 if k in LABELS and old[i] != new[i]:
                     L += [f"  {LABELS[k]} vorher:  {old[i]}", f"  {LABELS[k]} jetzt:   {new[i]}"]
-            L += [f"  Karte:    {position_hint(new, rules, old)}"] + kategorie_hint(new, rules) + [""]
+            L += karte_zeile(position_hint(new, rules, old)) + kategorie_hint(new, rules) + [""]
     if removed:
         L += [f"ENTFERNT / nicht mehr aufgeführt ({len(removed)})", ""]
         for t in removed:
@@ -461,7 +465,7 @@ def build_message(added, changed, removed, stand, rules):
     map_url = os.environ.get("MAP_URL")
     if map_url:
         L.append(f"Karte:      {map_url}")
-    L += [f"LBV-Seite:  {URL}", "", "Diese Nachricht wurde automatisch erzeugt. Maßgeblich sind die LBV-Seite und die Beschilderung vor Ort."]
+    L += ["", "Diese Nachricht wurde automatisch erzeugt. Maßgeblich ist die Beschilderung vor Ort."]
     return subject, "\n".join(L), n
 
 
@@ -478,8 +482,12 @@ def send_ntfy(subject, body):
         return False
     server = (os.environ.get("NTFY_SERVER") or "https://ntfy.sh").rstrip("/")
     try:
-        r = requests.post(f"{server}/{topic}", data=body.encode("utf-8"),
-                          headers={"Title": encode_header(subject), "Priority": "default"}, timeout=15)
+        headers = {"Title": encode_header(subject), "Priority": "default"}
+        map_url = (os.environ.get("MAP_URL") or "").strip()
+        if map_url.startswith("https://"):                  # Antippen der Nachricht + Schaltfläche öffnen die Karte
+            headers["Click"] = map_url
+            headers["Actions"] = f"view, Zur Sperrkarte, {map_url}, clear=false"
+        r = requests.post(f"{server}/{topic}", data=body.encode("utf-8"), headers=headers, timeout=15)
         r.raise_for_status()
         return True
     except Exception as e:
