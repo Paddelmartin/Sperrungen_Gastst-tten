@@ -1,15 +1,32 @@
 name: Spreewald-Sperrkarte täglich
 on:
   schedule:
-    - cron: "30 4 * * *"      # Karte aktualisieren: 04:30 UTC = 06:30 Sommerzeit / 05:30 Winterzeit (ohne Push)
-    - cron: "30 6 * * *"      # Abgleich + Push: 06:30 UTC = 08:30 Sommerzeit / 07:30 Winterzeit
-    - cron: "0 12 * * *"      # Abgleich + Push: 12:00 UTC = 14:00 Sommerzeit / 13:00 Winterzeit
+    # Alle 30 Minuten (:07 und :37 UTC), 03:07-15:37 UTC = 05:07-17:37 Sommerzeit / 04:07-16:37 Winterzeit.
+    # Doppelt so viele Versuche, weil GitHub einzelne Läufe oft auslässt (22./23.10.2026 über Stunden kein Lauf).
+    # GitHub startet geplante Läufe oft mit 20-50 Minuten Verspätung und lässt gelegentlich einen ganz aus -
+    # mit stündlichen Läufen holt der nächste das nach. Ob eine Push-Nachricht gesendet wird, entscheidet der
+    # Schritt "Push-Zeitfenster" nach deutscher Uhrzeit (nicht nach der Cron-Zeit).
+    - cron: "7,37 3-15 * * *"
+    # Wochenbericht (Selbstprüfung) montags 06:23 UTC = 08:23 Sommerzeit / 07:23 Winterzeit, nur an den Admin-Kanal.
+    - cron: "23 6 * * 1"
+  push:                       # Pflege-Seite gespeichert -> Karte sofort neu bauen (ohne Push-Nachricht)
+    branches: [main]
+    paths: [gaststaetten.yaml, gewaesser.yaml, eigene-sperrungen.yaml, state/admin-test.txt]   # admin-test.txt: Testknopf auf den Pflege-Seiten
   workflow_dispatch:
     inputs:
       testpush:
         description: "Nur eine Test-Push-Nachricht senden, um die ntfy-Einstellungen zu prüfen"
         type: boolean
         default: false
+      wochenbericht:
+        description: "Wochenbericht (Selbstprüfung) erzeugen und an den Admin-Kanal senden"
+        type: boolean
+        default: false
+      testadmin:
+        description: "Test-Nachricht an den Admin-Kanal senden (Secret NTFY_ADMIN_TOPIC prüfen)"
+        type: boolean
+        default: false
+concurrency: { group: sperrkarte, cancel-in-progress: false }   # Läufe nacheinander statt gleichzeitig
 permissions: { contents: write, pages: write, id-token: write, issues: write }
 jobs:
   build:
@@ -19,8 +36,23 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install -r requirements.txt
+      - name: Push-Zeitfenster (Nachrichten nur tagsüber, 08:00-18:00 Uhr deutscher Zeit)
+        id: zeit
+        run: |
+          H=$(TZ=Europe/Berlin date +%-H)
+          if [ "$H" -ge 8 ] && [ "$H" -lt 18 ]; then echo "push=ja" >> "$GITHUB_OUTPUT"; else echo "push=nein" >> "$GITHUB_OUTPUT"; fi
+          echo "Deutsche Uhrzeit (Stunde): $H"
+      - name: Geplante Läufe der letzten 7 Tage zählen (für den Wochenbericht)
+        if: ${{ github.event.schedule == '23 6 * * 1' || inputs.wochenbericht }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SEIT=$(date -u -d '7 days ago' +%F)
+          N=$(gh api "repos/${{ github.repository }}/actions/workflows/daily.yml/runs?event=schedule&created=%3E%3D$SEIT&per_page=1" --jq .total_count)
+          echo "LAEUFE_7T=$N" >> "$GITHUB_ENV"
       - name: Karte bauen und Änderungen melden
-        run: python spreewald_sperrungen.py ${{ (github.event.schedule == '30 6 * * *' || github.event.schedule == '0 12 * * *' || github.event_name == 'workflow_dispatch') && '--notify' || '' }} ${{ inputs.testpush && '--test-push' || '' }}
+        run: python spreewald_sperrungen.py ${{ (github.event.schedule == '23 6 * * 1' || inputs.wochenbericht) && '--selbstpruefung' || '' }} ${{ (github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && steps.zeit.outputs.push == 'ja')) && '--notify' || '' }} ${{ inputs.testpush && '--test-push' || '' }}
         env:
           KONTAKT: ${{ secrets.KONTAKT }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
@@ -28,17 +60,48 @@ jobs:
           ISSUE_FILE: ${{ vars.ISSUE_NOTIFY == 'true' && 'aenderungen.md' || '' }}
           NOTIFY_USERS: ${{ vars.NOTIFY_USERS }}
           MAP_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+      - name: Warnung an den Admin-Kanal (z. B. LBV-Tabelle plötzlich viel kleiner)
+        if: hashFiles('warnung.txt') != ''
+        continue-on-error: true
+        env:
+          NTFY_ADMIN_TOPIC: ${{ secrets.NTFY_ADMIN_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+        run: |
+          if [ -n "$NTFY_ADMIN_TOPIC" ]; then
+            curl -fsS -H "Title: Sperrkarte - bitte pruefen" -H "Tags: warning" \
+              --data-binary @warnung.txt "${NTFY_SERVER:-https://ntfy.sh}/$NTFY_ADMIN_TOPIC"
+          else
+            echo "NTFY_ADMIN_TOPIC nicht gesetzt - Warnung nur im Protokoll."
+          fi
+      - name: Wochenbericht an den Admin-Kanal
+        if: hashFiles('selbstpruefung.txt') != ''
+        continue-on-error: true
+        env:
+          NTFY_ADMIN_TOPIC: ${{ secrets.NTFY_ADMIN_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+        run: |
+          if [ -n "$NTFY_ADMIN_TOPIC" ]; then
+            curl -fsS -H "Title: $(cat selbstpruefung.titel)" -H "Tags: bar_chart" \
+              --data-binary @selbstpruefung.txt "${NTFY_SERVER:-https://ntfy.sh}/$NTFY_ADMIN_TOPIC"
+          else
+            echo "NTFY_ADMIN_TOPIC nicht gesetzt - Wochenbericht nur im Protokoll."; cat selbstpruefung.txt
+          fi
       - name: Änderungen als GitHub-Hinweis anlegen
         if: hashFiles('aenderungen.md') != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh issue create --title "$(cat aenderungen.title)" --body-file aenderungen.md
       - name: Stand für den nächsten Vergleich speichern
+        continue-on-error: true
         run: |
           git config user.name "sperrkarte-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add state/letzter_stand.json || true
-          git diff --cached --quiet || (git commit -m "LBV-Stand aktualisiert" && git push)
+          git add state/letzter_stand.json state/geo_cache.json state/ohne_position.json || true
+          if ! git diff --cached --quiet; then
+            git commit -m "LBV-Stand aktualisiert"
+            git pull --rebase origin main || true
+            git push || echo "Push fehlgeschlagen (vermutlich zeitgleicher Lauf) - wird beim naechsten Mal erneut versucht."
+          fi
       - uses: actions/upload-pages-artifact@v3
         with: { path: docs }
   deploy:
@@ -47,3 +110,38 @@ jobs:
     environment: { name: github-pages }
     steps:
       - uses: actions/deploy-pages@v4
+  alarm:                      # Ausfall-Alarm: meldet einen fehlgeschlagenen Lauf per Push an den Admin-Kanal
+    needs: [build, deploy]
+    if: ${{ always() && (needs.build.result == 'failure' || needs.deploy.result == 'failure') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Admin-Push senden
+        env:
+          NTFY_ADMIN_TOPIC: ${{ secrets.NTFY_ADMIN_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$NTFY_ADMIN_TOPIC" ]; then
+            echo "NTFY_ADMIN_TOPIC nicht gesetzt - kein Admin-Alarm."
+            exit 0
+          fi
+          curl -fsS -H "Title: Sperrkarte - Lauf fehlgeschlagen" -H "Priority: high" -H "Tags: warning" \
+            -d "Der automatische Lauf der Spreewald-Sperrkarte ist fehlgeschlagen, die Karte kann veraltet sein. Protokoll: $RUN_URL" \
+            "${NTFY_SERVER:-https://ntfy.sh}/$NTFY_ADMIN_TOPIC" || echo "Admin-Push konnte nicht gesendet werden."
+  admintest:                  # Test des Admin-Kanals: Knopf auf erfassen.html/gewaesser.html oder manueller Start mit "testadmin"
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.testadmin) || (github.event_name == 'push' && contains(github.event.head_commit.message, 'Admin-Test')) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test-Push an den Admin-Kanal
+        env:
+          NTFY_ADMIN_TOPIC: ${{ secrets.NTFY_ADMIN_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+        run: |
+          if [ -z "$NTFY_ADMIN_TOPIC" ]; then
+            echo "::error::Das Secret NTFY_ADMIN_TOPIC ist nicht gesetzt (GitHub: Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          curl -fsS -H "Title: Sperrkarte - Test Admin-Kanal" -H "Tags: white_check_mark" \
+            -d "Test erfolgreich: Der Admin-Kanal funktioniert. Hier kommen kuenftig Fehler- und Pruefmeldungen an." \
+            "${NTFY_SERVER:-https://ntfy.sh}/$NTFY_ADMIN_TOPIC"
+          echo "Testnachricht gesendet."
