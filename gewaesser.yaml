@@ -18,6 +18,12 @@
 # Offen: Conradsbrücke (Spree, Brücke 08/78, Burg, Schwarze Ecke 1) - Position fehlt noch.
 
 regeln:
+  - match: "spree"
+    bereich: "Dubkow Mühle"
+    manual:
+      - point: [51.844286, 14.059417]
+        radius_m: 20
+
   - match: "obere boblitzer kahnfahrt"
     bereich: "Oberspreewald, zwischen Südumfluter und Bahntrasse Cottbus-Lübbenau"
     manual:
