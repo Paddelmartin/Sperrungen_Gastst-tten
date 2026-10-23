@@ -588,6 +588,57 @@ def ohne_position(items, state_file, warn_file):
     warn_file.write_text((alt + "\n\n" if alt else "") + text, encoding="utf-8")
 
 
+def selbstpruefung(rows, items, gaststaetten, osm_info, stand, day, out_file):
+    """Wochenbericht für den Admin-Kanal: prüft, ob die Karte noch zu den LBV-Daten passt, und schreibt
+    selbstpruefung.txt (Bericht) und selbstpruefung.titel (Betreff). Der Workflow sendet beides an den Admin-Kanal."""
+    ok, warn = [], []
+    karte = [i for i in items if i.get("quelle") == "lbv"]
+    ok.append(f"LBV-Tabelle: {len(rows)} Zeilen gelesen, {len(karte)} davon aktuell oder bald relevant.")
+    ohne = [f"{i['gewaesser']} | {i['bereich'][:60]}" for i in karte
+            if i.get("status") != "gebiet" and i.get("regel") is None
+            and not i["gewaesser"].lower().startswith("oberspreewald")]
+    if ohne:
+        warn.append(f"{len(ohne)} Sperrung(en) ohne Kartenposition (nur in der Liste): " + "; ".join(ohne[:5]))
+    else:
+        ok.append("Alle Sperrungen sind auf der Karte verortet.")
+    leer = [i["gewaesser"] for i in karte
+            if i.get("status") != "gebiet" and i.get("regel") is not None and not i.get("geom")]
+    if leer:
+        warn.append("Regel vorhanden, aber keine Linie von OpenStreetMap erhalten: " + "; ".join(leer[:5]))
+    try:
+        alter = (day - datetime.strptime(stand, "%d.%m.%Y").date()).days
+        if alter > 30:
+            warn.append(f"LBV-Stand ist {alter} Tage alt ({stand}). Pflegt die LBV die Seite noch?")
+        else:
+            ok.append(f"LBV-Stand {stand} (vor {alter} Tagen).")
+    except Exception:
+        warn.append(f"LBV-Stand nicht lesbar ({stand!r}).")
+    laeufe = os.environ.get("LAEUFE_7T", "").strip()
+    if laeufe.isdigit():
+        n = int(laeufe)
+        (warn if n < 20 else ok).append(f"Geplante Läufe der letzten 7 Tage: {n} (Soll ca. 180; GitHub lässt manche aus).")
+    unbekannt = [g["name"] for g in gaststaetten if g["status"] == "unbekannt"]
+    nicht_osm = [n for n, inf in osm_info.items() if not inf["gefunden"] and n not in {g["name"] for g in gaststaetten}]
+    pause = [g["name"] for g in gaststaetten if g["status"] == "saisonpause"]
+    ohne_saison = [g["name"] for g in gaststaetten if not g.get("saison")]
+    if unbekannt:
+        warn.append("Gaststätten mit unbekanntem Status (Öffnungszeiten prüfen): " + ", ".join(unbekannt[:8]))
+    if nicht_osm:
+        warn.append("Gaststätten nicht auf der Karte (Koordinaten fehlen): " + ", ".join(nicht_osm[:8]))
+    ok.append(f"Gaststätten: {len(gaststaetten)} angezeigt, {len(pause)} in Saisonpause, {len(ohne_saison)} ohne Saisonangabe.")
+    eigene = len([i for i in items if i.get("quelle") == "eigen"])
+    ok.append(f"Eigene Sperrungen/Hinweise: {eigene}.")
+    if warn:
+        titel = "Sperrkarte - Wochenbericht: bitte pruefen"
+        text = "BITTE PRÜFEN:\n" + "\n".join("- " + w for w in warn) + "\n\nIn Ordnung:\n" + "\n".join("- " + o for o in ok)
+    else:
+        titel = "Sperrkarte - Wochenbericht: alles in Ordnung"
+        text = "\n".join("- " + o for o in ok)
+    out_file.write_text(text, encoding="utf-8")
+    out_file.with_suffix(".titel").write_text(titel, encoding="utf-8")
+    print("Wochenbericht erstellt:", titel)
+
+
 def load_own_notices(path, day, lookahead):
     """Liest eigene, von Mitarbeitern gepflegte Hinweise (eigene-sperrungen.yaml).
     Fehlerhafte einzelne Einträge werden übersprungen (mit Warnung), statt den ganzen Lauf abzubrechen."""
@@ -850,6 +901,7 @@ def main():
     ap.add_argument("--no-osm", action="store_true", help="keine Overpass-Abfragen (nur Cache/manual)")
     ap.add_argument("--lookahead", type=int, default=7, help="Tage, für die 'bald' angezeigt wird")
     ap.add_argument("--notify", action="store_true", help="bei Änderungen der LBV-Tabelle eine Push-Nachricht/GitHub-Hinweis senden")
+    ap.add_argument("--selbstpruefung", action="store_true", help="Wochenbericht für den Admin-Kanal erzeugen (selbstpruefung.txt)")
     ap.add_argument("--test-push", action="store_true", help="nur eine Test-Push-Nachricht senden (ntfy-Konfiguration prüfen)")
     ap.add_argument("--state-file", default=str(STATE))
     ap.add_argument("--out", default=str(HERE / "docs" / "index.html"))
@@ -900,6 +952,8 @@ def main():
         print(f"{i['status']:15} {'auf Karte ' if i['geom'] else 'OHNE Geo  '} {i['gewaesser']}{marker} | {i['bereich'][:60]}")
     print(f"\n{len(items)} Einträge für {day} -> {a.out}")
 
+    if a.selbstpruefung:
+        selbstpruefung(rows, items, gaststaetten, osm_info, stand, day, HERE / "selbstpruefung.txt")
     if a.notify:
         warn = HERE / "warnung.txt"
         warn.unlink(missing_ok=True)
