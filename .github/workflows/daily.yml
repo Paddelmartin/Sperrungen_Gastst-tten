@@ -9,7 +9,7 @@ on:
     - cron: "7,37 3-15 * * *"
   push:                       # Pflege-Seite gespeichert -> Karte sofort neu bauen (ohne Push-Nachricht)
     branches: [main]
-    paths: [gaststaetten.yaml, gewaesser.yaml, eigene-sperrungen.yaml, state/admin-test.txt]   # admin-test.txt: Testknopf auf den Pflege-Seiten
+    paths: [gaststaetten.yaml, gewaesser.yaml, eigene-sperrungen.yaml, state/admin-test.txt, state/aktualisieren.txt]   # admin-test.txt / aktualisieren.txt: Knöpfe auf den Pflege-Seiten
   workflow_dispatch:
     inputs:
       testpush:
