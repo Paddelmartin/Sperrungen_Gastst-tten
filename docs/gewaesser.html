@@ -91,6 +91,12 @@
   .topnav a.karte{background:var(--brand-orange);border-color:var(--brand-orange);color:#fff}
   .topnav a.karte:hover{background:var(--brand-orange-dark);border-color:var(--brand-orange-dark)}
   .topnav a.aktiv{background:var(--brand-blue);border-color:var(--brand-blue);color:#fff;cursor:default;box-shadow:none}
+
+  .topnav button{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;
+    padding:9px 16px;border-radius:999px;border:1px dashed var(--brand-blue);background:transparent;color:var(--brand-blue-dark)}
+  .topnav button:hover{background:#eef4fa}
+  .topnav button:disabled{opacity:.6;cursor:wait}
+  #aktu-info{font-size:13px;margin:-6px 0 14px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -99,7 +105,8 @@
     <img src="logo.png" alt="Bootsverleih Richter">
     <h1>Gewässer pflegen</h1>
   </header>
-  <nav class="topnav"><a class="karte" href="index.html">← Zur Sperrkarte</a><a href="erfassen.html">Gaststätten pflegen</a><a href="gewaesser.html" class="aktiv" aria-current="page">Gewässer pflegen</a></nav>
+  <nav class="topnav"><a class="karte" href="index.html">← Zur Sperrkarte</a><a href="erfassen.html">Gaststätten pflegen</a><a href="gewaesser.html" class="aktiv" aria-current="page">Gewässer pflegen</a><button type="button" id="aktu-btn" onclick="karteAktualisieren()">↻ Karte aktualisieren</button></nav>
+  <div id="aktu-info" style="display:none"></div>
   <div class="sub">Änderungen werden erst mit „Bei GitHub speichern“ übernommen; die Karte baut sich danach in
     wenigen Minuten neu.</div>
 
@@ -864,6 +871,33 @@ function tokenEntfernen(){
 function tokenAnzeige(){ $('token-summary').textContent = token() ? 'Speichern ist auf diesem Gerät eingerichtet' : 'Zugangsschlüssel eintragen'; }
 
 // ---------------------------------------------------------------- Betreiber-Test: Admin-Kanal
+// "Karte aktualisieren": legt state/aktualisieren.txt an; das löst bei GitHub einen Neubau der Karte aus
+// (Push-Auslöser im Workflow, ohne Mitarbeiter-Nachricht). Nutzt denselben Zugangsschlüssel wie das Speichern.
+async function karteAktualisieren(){
+  const info = $('aktu-info'), btn = $('aktu-btn'), t = token();
+  const zeige = (art, text) => { info.style.display = ''; info.style.color = art === 'err' ? 'var(--err)' : art === 'ok' ? 'var(--ok)' : ''; info.textContent = text; };
+  if(!t){ zeige('err', 'Zuerst unten den Zugangsschlüssel einrichten („Speichern einrichten“).'); return; }
+  btn.disabled = true; zeige('', 'Sende …');
+  const url = `https://api.github.com/repos/${REPO}/contents/state/aktualisieren.txt`;
+  const kopf = {'Accept':'application/vnd.github+json', 'Authorization':'Bearer ' + t};
+  try{
+    let sha = null;
+    const g = await fetch(`${url}?ref=${BRANCH}`, {headers: kopf, cache:'no-store'});
+    if(g.ok) sha = (await g.json()).sha;
+    else if(g.status !== 404) throw g.status;
+    const body = {message: 'Karte aktualisieren angefordert', branch: BRANCH, content: btoa(new Date().toISOString() + '\n')};
+    if(sha) body.sha = sha;
+    const r = await fetch(url, {method:'PUT', headers: {...kopf, 'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    if(!r.ok) throw r.status;
+    zeige('ok', 'Auftrag ist bei GitHub angekommen. In etwa 2–3 Minuten ist die Karte aktuell (Seite dann mit Strg+F5 neu laden).');
+  }catch(status){
+    zeige('err', status === 401 ? 'Der Zugangsschlüssel ist ungültig oder abgelaufen.'
+      : (status === 403 || status === 404) ? 'Der Zugangsschlüssel darf nicht in dieses Repository schreiben (Contents: Read and write?).'
+      : (status === 409 || status === 422) ? 'Gerade wurde gleichzeitig etwas geändert – bitte noch einmal tippen.'
+      : 'Die Aktualisierung konnte nicht ausgelöst werden' + (typeof status === 'number' ? ` (HTTP ${status}).` : ' (keine Verbindung zu GitHub).'));
+  }finally{ btn.disabled = false; }
+}
+
 // Legt state/admin-test.txt mit dem Commit-Text "Admin-Test angefordert" an; dadurch startet bei GitHub der
 // Workflow-Job "admintest", der über das Secret NTFY_ADMIN_TOPIC eine Testnachricht sendet.
 async function adminTestSenden(){
