@@ -19,6 +19,17 @@
 
 regeln:
   - match: "zerniasfließ, puhlstrom und wasserburger spree"
+    bereich: "Zerniasfließ, puhlstrom, wasserburger Spree, Brücke"
+    genau: false
+    manual:
+      - point: [52.029874, 13.874896]
+        radius_m: 50
+      - point: [52.029874, 13.869349]
+        radius_m: 50
+      - point: [52.034495, 13.858255]
+        radius_m: 50
+
+  - match: "zerniasfließ, puhlstrom und wasserburger spree"
     bereich: "Brücken L421"
     genau: false
     notiz: "Brücken L421"
