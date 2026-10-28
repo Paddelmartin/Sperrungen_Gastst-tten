@@ -18,6 +18,18 @@
 # Offen: Conradsbrücke (Spree, Brücke 08/78, Burg, Schwarze Ecke 1) - Position fehlt noch.
 
 regeln:
+  - match: "zerniasfließ, puhlstrom und wasserburger spree"
+    bereich: "Brücken L421"
+    genau: false
+    notiz: "Brücken L421"
+    manual:
+      - point: [52.03035, 13.880887]
+        radius_m: 50
+      - point: [52.029846, 13.869337]
+        radius_m: 50
+      - point: [52.029873, 13.874903]
+        radius_m: 50
+
   - match: "spree"
     bereich: "Dubkow Mühle"
     manual:
