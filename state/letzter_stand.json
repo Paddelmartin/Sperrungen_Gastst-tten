@@ -1,5 +1,5 @@
 {
- "stand": "02.11.2026",
+ "stand": "03.11.2026",
  "rows": [
   {
    "gewaesser": "Zerniasfließ, Puhlstrom und Wasserburger Spree (Einschränkungen)",
@@ -77,13 +77,6 @@
    "zeitraum": "10.06.2026 bis 13.11.2026",
    "grund": "Krautungsarbeiten",
    "hinweis": "Auf Grund der Krautungsarbeiten kann es zu kurzfristigen, temporären und zeitlich befristeten Sperrungen schiffbarer Landesgewässer kommen. Beachten Sie bitte die Hinweise die Ihnen durch die Schifffahrtszeichen gegeben werden. Das passieren eventuell gesperrter Bereiche ist nur nach erfolgter Freigabe durch die Vorort Verantwortlichen unter größter Vorsicht möglich. Den Anweisungen der Vorort Verantwortlichen ist unbedingt Folge zu leisten!"
-  },
-  {
-   "gewaesser": "Spree (Einschränkungen)",
-   "bereich": "Oberspreewald, Ortslage Burg, zwischen Jedroschleuse am Wehr 27 und Kreisgrenze SPN/OSL",
-   "zeitraum": "11.05.2026 bis 20.11.2026",
-   "grund": "Ufersicherungarbeiten",
-   "hinweis": "Es kann zu Einschränkungen der Schifffahrt kommen, Das Passieren des halbseitig gesperrten Bereiches ist nur nach Freigabe durch den Vorort Verantwortlichen und unter größter Vorsicht möglich. Den Anweisungen der Vorort Verantwortlichen ist unbedingt Folge zu leisten!"
   },
   {
    "gewaesser": "Dresslerstrom (Sperrung)",
