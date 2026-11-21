@@ -5,22 +5,22 @@
    "gewaesser": "Spree (Sperrung)",
    "bereich": "Oberspreewald, im Bereich der Wander- und Radwegbrücke oberhalb der Dubkow Mühle",
    "zeitraum": "26.10.2026 bis 04.12.2026",
-   "grund": "Erneurung der Oberbauten der Brücke",
-   "hinweis": "Es kann zu Einschränkung bzw. Sperrungen der Schifffahrt kommen. Bitte beachten Sie die Hinweise die Ihnen durch die Schifffahrtszeichen gegeben werden. Den Anweisungen der Vorort Verantwortlichen ist unbedingt Folge zu leisten."
+   "grund": "Erneuerung der Oberbauten der Brücke",
+   "hinweis": "Es kann zu Einschränkungen bzw. Sperrungen der Schifffahrt kommen. Bitte beachten Sie die Hinweise die Ihnen durch die Schifffahrtszeichen gegeben werden. Den Anweisungen der Vor Ort Verantwortlichen ist unbedingt Folge zu leisten."
   },
   {
    "gewaesser": "Obere Boblitzer Kahnfahrt (Einschränkungen)",
    "bereich": "Oberspreewald, zwischen Südumfluter und Bahntrasse Cottbus-Lübbenau",
    "zeitraum": "19.10.2026 bis 30.11.2026",
    "grund": "Ufersicherungsarbeiten",
-   "hinweis": "Es kann zu Einschränkungen der Schifffahrt kommen. Ein passieren des halbseitig gesperrten Bereichs ist nur nach Freigabe durch den Vorort Verantwortlichen und unter größter Vorsicht möglich. Den Anweisungen der Vorort Verantwortlichen ist unbedingt Folge zu leisten!"
+   "hinweis": "Es kann zu Einschränkungen der Schifffahrt kommen. Das Passieren des halbseitig gesperrten Bereichs ist nur nach Freigabe durch den Vorort Verantwortlichen und unter größter Vorsicht möglich. Den Anweisungen der Vor Ort Verantwortlichen ist unbedingt Folge zu leisten!"
   },
   {
    "gewaesser": "Schiffbare Landesgewässer im Oberspreewald (Einschränkungen / Sperrungen)",
-   "bereich": "Oberspreewald zwischen Anfang der Schiffbarkeit in Burg(Spreewald) und Ragower Kahnfahrt",
+   "bereich": "Oberspreewald zwischen Anfang der Schiffbarkeit in Burg (Spreewald) und Ragower Kahnfahrt",
    "zeitraum": "12.10.2026 bis 26.02.2027",
    "grund": "Baumfällarbeiten zur Aufrechterhaltung der Verkehrssicherheit",
-   "hinweis": "Auf Grund der Baumfällarbeiten kann es zur kurzfristigen, temporären und zeitlich befristeten Sperrungen schiffbarer Landesgewässer kommen. Bitte beachten Sie die Hinweise die Ihnen durch Schifffahrtszeichen gegeben werden. Das passieren gesperrter Bereiche ist nur nach erfolgter Freigabe durch die Vorort Verantwortlichen unter größter Vorsicht möglich. Den Anweisungen der Vorort Verantwortlichen ist unbedingt Folge zu leisten."
+   "hinweis": "Auf Grund der Baumfällarbeiten kann es zur kurzfristigen, temporären und zeitlich befristeten Sperrungen schiffbarer Landesgewässer kommen. Bitte beachten Sie die Hinweise die Ihnen durch Schifffahrtszeichen gegeben werden. Das Passieren gesperrter Bereiche ist nur nach erfolgter Freigabe durch die Vorort Verantwortlichen unter größter Vorsicht möglich. Den Anweisungen der Vor Ort Verantwortlichen ist unbedingt Folge zu leisten."
   },
   {
    "gewaesser": "Spree (Sperrung)",
@@ -55,7 +55,7 @@
    "bereich": "Oberspreewald, zwischen Bahnlinie Cottbus-Berlin und Einmündung in die Spree",
    "zeitraum": "14.09.2026 bis 30.11.2026, Montag bis Freitag",
    "grund": "Sedimentberäumung",
-   "hinweis": "Vollsperrung! Fahrzeuge des Hafenbetreibers und des Bootsverleih können nach Rücksprache mit dem Vorortverantwortlichen passieren."
+   "hinweis": "Vollsperrung! Fahrzeuge des Hafenbetreibers und des Bootsverleihs können nach Rücksprache mit dem Vor Ort Verantwortlichen passieren"
   },
   {
    "gewaesser": "Lehder Graben (Sperrung)",
@@ -68,8 +68,8 @@
    "gewaesser": "Dresslerstrom (Sperrung)",
    "bereich": "Unterspreewald, von Puhlstrom bis Wasserburger Spree",
    "zeitraum": "03.02.2026 bis auf Widerruf",
-   "grund": "Verkehrsgefährdung durch eine standsichere Brücke",
-   "hinweis": "Vollsperrung, ein passieren des Gewässers ist nicht möglich! Nördliche Umfahrung über Puhlstrom, Langer-Horst-Graben und Wasserburger Spree. Südliche Umfahrung über Puhlstrom, Laubengang, Krausnicker Strom und Wasserburger Spree."
+   "grund": "Verkehrsgefährdung durch eine nicht standsichere Brücke",
+   "hinweis": "Vollsperrung, ein Passieren des Gewässers ist nicht möglich! Nördliche Umfahrung über Puhlstrom, Langer-Horst-Graben und Wasserburger Spree. Südliche Umfahrung über Puhlstrom, Laubengang, Krausnicker Strom und Wasserburger Spree."
   },
   {
    "gewaesser": "Mittelkanal / Weidenfließ (Sperrung)",
